@@ -51,6 +51,8 @@
 # z - 26 - Blue Slate
 # Z - 27 - Deep Light Blue
 
+# currently unused: d, M, t, T
+
 # (note that "black" is the same color as the screen background, and thus the
 # monster will appear to be an empty black space if its color is "d".)
 
