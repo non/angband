@@ -23,6 +23,17 @@
 #include "textui.h"
 #include "files.h"
 #include "macro.h"
+#include "init.h"
+
+/* this is used to draw the various terrain characters */
+static unsigned int graphics_table[32] = {
+	000, '*', '#', '?', '?', '?', '?', '.',
+	'+', '?', '?', '+', '+', '+', '+', '+',
+	'~', '-', '-', '-', '_', '+', '+', '+',
+	'+', '|', '?', '?', '?', '?', '?', '.',
+};
+
+iconv_t conv;
 
 /* 
  *Add a bunch of debugger message, to trace where problems are. 
@@ -206,9 +217,9 @@ gboolean on_big_tiles(GtkWidget *widget, GdkEventButton *event, gpointer user_da
 	term_data *td = &data[0];
 	
 	if ((widget != NULL) && (!gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(widget))))
-		use_bigtile = FALSE;
+		tile_width = 1;
 	else
-		use_bigtile = TRUE;
+		tile_width = 2;
 	
 	load_font_by_name(td, td->font.name);
 	term_data_redraw(td);
@@ -502,6 +513,52 @@ static errr Term_wipe_gtk(int x, int y, int n)
 	return (0);
 }
 
+static byte Term_xchar_gtk(byte c)
+{
+	/* Can't translate Latin-1 to UTF-8 here since we have to return a byte. */
+	return c;
+}
+
+char *process_control_chars(int n, cptr s)
+{
+	char *s2 = (char *)malloc(sizeof(char) * n);
+	int i;
+	for (i = 0; i < n; i++) {
+		unsigned char c = s[i];
+		if (c < 32) {
+			s2[i] = graphics_table[c];
+		} else if (c == 127) {
+			s2[i] = '#';
+		} else {
+			s2[i] = c;
+		}
+	}
+
+	return s2;
+}
+
+char *latin1_to_utf8(int n, cptr s)
+{
+	size_t inbytes = n;
+	char *s2 = process_control_chars(n, s);
+	char *p2 = s2;
+
+	size_t outbytes = 4 * n;
+	char *s3 = (char *)malloc(sizeof(char) * outbytes);
+	char *p3 = s3;
+
+	size_t result = iconv(conv, &p2, &inbytes, &p3, &outbytes);
+
+	if (result == (size_t)(-1)) {
+		printf("iconv() failed: %d\n", errno);
+		free(s3);
+		return s2;
+	} else {
+		free(s2);
+		return s3;
+	}
+}
+
 /*
  * Draw some textual characters.
  */
@@ -509,11 +566,18 @@ static errr Term_text_gtk(int x, int y, int n, byte a, cptr s)
 {
 	term_data *td = (term_data*)(Term->data);
 	cairo_rectangle_t r;
-	
+
+	char *s2;
+	if (conv == NULL)
+		s2 = process_control_chars(n, s);
+	else
+		s2 = latin1_to_utf8(n, s);
+
 	init_cairo_rect(&r, (td->font.w * x), (td->font.h * y),  (td->font.w * n), td->font.h);
-	draw_text(td->surface, &td->font, &td->actual, x, y, n, a, s);
+	draw_text(td->surface, &td->font, &td->actual, x, y, n, a, s2);
 	invalidate_drawing_area(td->drawing_area, r);
-			
+	
+	free(s2);
 	return (0);
 }
 
@@ -730,16 +794,8 @@ static void load_font_by_name(term_data *td, cptr font_name)
 	if (td->font.size == 0) td->font.size = 12;
 	get_font_size(&td->font);
 	
-	if (use_bigtile)
-	{
-		td->actual.w = td->font.w * 2;
-		td->actual.h = td->font.h;
-	}
-	else
-	{
-		td->actual.w = td->font.w;
-		td->actual.h = td->font.h;
-	}
+	td->actual.w = td->font.w * tile_width;
+	td->actual.h = td->font.h;
 	
 	td->size.w = td->cols * td->font.w;
 	td->size.h = td->rows * td->font.h;
@@ -1095,7 +1151,8 @@ static void save_prefs(void)
 	file_putf(fff, "[General Settings]\n");
 	/* Graphics setting */
 	file_putf(fff,"Tile set=%d\n", arg_graphics);
-	file_putf(fff,"Big Tiles=%d\n", use_bigtile);
+	file_putf(fff,"Tile Width=%d\n", tile_width);
+	file_putf(fff,"Tile Height=%d\n", tile_height);
 
 	/* New section */
 	file_putf(fff, "\n");
@@ -1230,11 +1287,11 @@ static void load_term_prefs()
 				arg_graphics = val;
 				continue;
 			}
-			if (prefix(buf, "Big Tiles="))
+			if (prefix(buf, "Tile Width="))
 			{
 				val = get_value(buf);
-				sscanf(buf, "Big Tiles=%d", &val);
-				use_bigtile = val;
+				sscanf(buf, "Tile Width=%d", &val);
+				tile_width = val;
 				continue;
 			}
 		}
@@ -1628,6 +1685,15 @@ static void init_graf(int g)
 			break;
 		}
 
+		case GRAPHICS_NOMAD:
+		{
+			ANGBAND_GRAF = "nomad";
+			path_build(buf, sizeof(buf), ANGBAND_DIR_XTRA_GRAF, "8x16.png");
+			use_transparency = TRUE;
+			td->tile.w = td->tile.h =16;
+			break;
+		}
+
 		case GRAPHICS_DAVID_GERVAIS:
 		{
 			ANGBAND_GRAF = "david";
@@ -1940,7 +2006,7 @@ static void show_windows(void)
 			gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(xd->menu),TRUE);
 	}
 	
-	if ((use_bigtile) && (big_tile_item != NULL))
+	if ((tile_width == 2) && (big_tile_item != NULL))
 		gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(big_tile_item), TRUE);
 }
 
@@ -1994,6 +2060,12 @@ static errr term_data_init(term_data *td, int i)
 {
 	term *t = &td->t;
 
+	conv = iconv_open("UTF-8", "ISO-8859-1");
+	if (conv == (iconv_t)(-1)) {
+		printf("iconv_open() failed: %d\n", errno);
+		conv = NULL;
+	}
+
 	td->cols = 80;
 	td->rows = 24;
 
@@ -2018,6 +2090,8 @@ static errr term_data_init(term_data *td, int i)
 	t->wipe_hook = Term_wipe_gtk;
 	t->curs_hook = Term_curs_gtk;
 	t->pict_hook = Term_pict_gtk;
+	if (conv != NULL)
+		t->xchar_hook = Term_xchar_gtk;
 	
 	/* Save the data */
 	t->data = td;
@@ -2157,6 +2231,17 @@ static void glog(cptr fmt, ...)
 		plog(str);
 }
 
+static void reinitialize_text_buffer(xtra_win_data *xd)
+{
+	if (!GTK_IS_TEXT_BUFFER(xd->buf))
+		xd->buf = gtk_text_buffer_new(NULL);
+	else
+		gtk_text_buffer_set_text(xd->buf, "", 0);
+	gtk_text_view_set_buffer(GTK_TEXT_VIEW(xd->text_view), xd->buf);
+	init_color_tags(xd);
+}
+
+
 /*
  * Update our own personal message window.
  */
@@ -2168,18 +2253,8 @@ static void handle_message(game_event_type type, game_event_data *data, void *us
 	int i;
 
 	if (!xd) return;
-	
-	if (!GTK_IS_TEXT_BUFFER(xd->buf))
-	{
-		xd->buf = gtk_text_buffer_new(NULL);
-	}
-	else
-	{
-		gtk_text_buffer_set_text(xd->buf, "", -1);
-	}
-	gtk_text_view_set_buffer(GTK_TEXT_VIEW (xd->text_view), xd->buf);
-	
-	init_color_tags(xd);
+
+	reinitialize_text_buffer(xd);
 	
 	num = messages_num();
 	
@@ -2266,20 +2341,9 @@ static void handle_inv(game_event_type type, game_event_data *data, void *user)
 	register int i, z;
 	byte attr;
 
-
 	if (!xd) return;
-	
-	if (!GTK_IS_TEXT_BUFFER(xd->buf))
-	{
-		xd->buf = gtk_text_buffer_new(NULL);
-	}
-	else
-	{
-		gtk_text_buffer_set_text(xd->buf, "", -1);
-	}
-	gtk_text_view_set_buffer(GTK_TEXT_VIEW(xd->text_view), xd->buf);
-	
-	init_color_tags(xd);
+
+	reinitialize_text_buffer(xd);
 	
 	z = last_inv_slot();
 	
@@ -2307,21 +2371,11 @@ static void handle_equip(game_event_type type, game_event_data *data, void *user
 	
 	register int i;
 	byte attr;
-		char str[80];
+	char str[80];
 	
 	if (!xd) return;
 	
-	if (!GTK_IS_TEXT_BUFFER(xd->buf))
-	{
-		xd->buf = gtk_text_buffer_new(NULL);
-	}
-	else
-	{
-		gtk_text_buffer_set_text(xd->buf, "", -1);
-	}
-	gtk_text_view_set_buffer(GTK_TEXT_VIEW(xd->text_view), xd->buf);
-	
-	init_color_tags(xd);
+	reinitialize_text_buffer(xd);
 	
 	/* Display the pack */
 	for (i = INVEN_WIELD; i < INVEN_TOTAL; i++)
@@ -2359,18 +2413,7 @@ static void handle_mons_list(game_event_type type, game_event_data *data, void *
 
 	if (!xd) return;
 
-	if (!GTK_IS_TEXT_BUFFER(xd->buf))
-	{
-		xd->buf = gtk_text_buffer_new(NULL);
-	}
-	else
-	{
-		gtk_text_buffer_set_text(xd->buf, "", -1);
-	}
-	
-	gtk_text_view_set_buffer(GTK_TEXT_VIEW (xd->text_view), xd->buf);
-	
-	init_color_tags(xd);
+	reinitialize_text_buffer(xd);
 	
 	/* Allocate the array */
 	race_count = C_ZNEW(z_info->r_max, u16b);
@@ -2497,7 +2540,7 @@ static void cr_print_equippy(xtra_win_data *xd, int y)
 	object_type *o_ptr;
 
 	/* No equippy chars if  we're in bigtile mode or creating a char */
-	if ((use_bigtile) || (arg_graphics != 0) || (!character_generated))
+	if ((tile_width == 2) || (arg_graphics != 0) || (!character_generated))
 	{
 		return;
 	}
@@ -2745,7 +2788,9 @@ errr init_gtk(int argc, char **argv)
 		/* Save global entry */
 		angband_term[i] = Term;
 	}
-	
+
+	/* Init dirs */
+	create_needed_dirs();	
 	
 	/* Load Preferences */
 	load_prefs();
@@ -2784,8 +2829,10 @@ errr init_gtk(int argc, char **argv)
 	/* Let's play */
 	play_game();
 
-	/* Stop now */
-	exit(0);
+	/* Do all the things main() in main.c already does */
+	cleanup_angband();
+	quit(NULL);
+	exit(0); /* just in case */
 
 	/* Success */
 	return (0);

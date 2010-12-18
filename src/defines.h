@@ -40,9 +40,9 @@
 #define SAVEFILE_NAME  "VNLA"
 
 #ifdef BUILD_ID
-# define VERSION_STRING "3.1.2 (" BUILD_ID ")"
+# define VERSION_STRING "3.2.0 (" BUILD_ID ")"
 #else
-# define VERSION_STRING "3.1.2"
+# define VERSION_STRING "3.2.0"
 #endif
 
 
@@ -71,33 +71,34 @@
  */
 #define BLOCK_WID	11
 
-/*
+/**
  * Number of grids in each panel (vertically)
- * Must be a multiple of BLOCK_HGT
  */
-#define PANEL_HGT	11
+#define PANEL_HGT	((int)(BLOCK_HGT / tile_height))
 
-/*
+/**
  * Number of grids in each panel (horizontally)
- * Must be a multiple of BLOCK_WID
  */
-#define PANEL_WID	(use_bigtile ? 16 : 33)
+#define PANEL_WID 	((int)(BLOCK_WID / tile_width))
+
+
+/**
+ * Number of text rows in each map screen, regardless of tile size
+ */
+#define SCREEN_ROWS	(Term->hgt - ROW_MAP - 1) 
+
+/**
+ * Number of grids in each screen (vertically)
+ */
+#define SCREEN_HGT    ((int) (SCREEN_ROWS / tile_height))
+
+/**
+ * Number of grids in each screen (horizontally)
+ */
+#define SCREEN_WID	((int)((Term->wid - COL_MAP - 1) / tile_width))
 
 #define ROW_MAP			1
 #define COL_MAP			13
-
-
-/*
- * Number of grids in each screen (vertically)
- * Must be a multiple of PANEL_HGT (at least 2x)
- */
-#define SCREEN_HGT	(Term->hgt - ROW_MAP - 1)
-
-/*
- * Number of grids in each screen (horizontally)
- * Must be a multiple of PANEL_WID (at least 2x)
- */
-#define SCREEN_WID	((Term->wid - COL_MAP - 1) / (use_bigtile ? 2 : 1))
 
 
 /*
@@ -138,7 +139,7 @@
  * Maximum amount of starting equipment, and starting gold
  */
 #define MAX_START_ITEMS	5
-#define STARTING_GOLD 700
+#define STARTING_GOLD 600
 
 /*
  * Number of tval/min-sval/max-sval slots per ego_item
@@ -258,7 +259,7 @@ typedef enum
  * More maximum values
  */
 #define MAX_SIGHT	20	/* Maximum view distance */
-#define MAX_RANGE	18	/* Maximum range (spells, etc) */
+#define MAX_RANGE	20	/* Maximum range (spells, etc) */
 
 
 
@@ -1141,6 +1142,7 @@ enum
 #define IDENT_NAME	0x0400	/* Know the name of ego or artifact if there is one */
 #define IDENT_FIRED	0x0800  /* Has been used as a missile */
 #define IDENT_NOTART 0x1000  /* Item is known not to be an artifact */
+#define IDENT_FAKE	0x2000  /* Item is a fake, for displaying knowledge */
 /* ... */
 
 
@@ -1647,13 +1649,13 @@ enum
  * Convert a "key event" into a "location" (Y)
  */
 #define KEY_GRID_Y(K) \
-	((int) ((K.mousey - ROW_MAP) + Term->offset_y))
+  ((int) (((K.mousey - ROW_MAP) / tile_height) + Term->offset_y))
 
 /*
  * Convert a "key event" into a "location" (X)
  */
 #define KEY_GRID_X(K) \
-	((int) (((K.mousex - COL_MAP) / (use_bigtile ? 2 : 1)) + Term->offset_x))
+	((int) (((K.mousex - COL_MAP) / tile_width) + Term->offset_x))
 
 
 /*
@@ -1787,6 +1789,7 @@ enum
 #define GRAPHICS_ADAM_BOLT      2
 #define GRAPHICS_DAVID_GERVAIS  3
 #define GRAPHICS_PSEUDO         4
+#define GRAPHICS_NOMAD          5
 
 
 /* player_type.noscore flags */

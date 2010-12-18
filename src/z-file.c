@@ -15,14 +15,9 @@
  *    and not for profit purposes provided that this copyright and statement
  *    are included in all such copies.  Other copyrights may also apply.
  */
-#include "z-file.h"
-#include "z-virt.h"
-#include "z-util.h"
-#include "z-form.h"
+#include "angband.h"
 
-#ifndef RISCOS
-# include <sys/types.h>
-#endif
+#include <sys/types.h>
 
 #ifdef WINDOWS
 # include <windows.h>
@@ -114,18 +109,8 @@ void safe_setuid_grab(void)
  */
 static void path_parse(char *buf, size_t max, cptr file)
 {
-#ifndef RISCOS
-
 	/* Accept the filename */
 	my_strcpy(buf, file, max);
-
-#else /* RISCOS */
-
-	/* Defined in main-ros.c */
-	char *riscosify_name(const char *path);
-	my_strcpy(buf, riscosify_name(path), max);
-
-#endif /* !RISCOS */
 }
 
 
@@ -335,8 +320,6 @@ bool file_exists(const char *fname)
 
 #endif
 
-#ifndef RISCOS
-
 /*
  * Return TRUE if first is newer than second, FALSE otherwise.
  */
@@ -357,8 +340,6 @@ bool file_newer(const char *first, const char *second)
 	return FALSE;
 #endif /* !HAVE_STAT */
 }
-
-#endif /* RISCOS */
 
 
 
@@ -604,6 +585,8 @@ bool file_getl(ang_file *f, char *buf, size_t len)
 	byte b;
 	size_t i = 0;
 
+	bool check_encodes = FALSE;
+
 	/* Leave a byte for the terminating 0 */
 	size_t max_len = len - 1;
 
@@ -653,14 +636,24 @@ bool file_getl(ang_file *f, char *buf, size_t len)
 		}
 
 		/* Ignore non-printables */
-		if (!isprint((unsigned char) c))
+		else if (my_isprint((unsigned char)c))
+  		{
+			buf[i++] = c;
+
+			/* Notice possible encode */
+ 			if (c == '[') check_encodes = TRUE;
+
+			continue;
+		}
+		else
 		{
 			buf[i++] = '?';
 			continue;
 		}
-
-		buf[i++] = c;
 	}
+
+	/* Translate encodes if necessary */
+ 	if (check_encodes) xstr_trans(buf, LATIN1);
 
 	buf[i] = '\0';
 	return TRUE;
@@ -688,6 +681,31 @@ bool file_putf(ang_file *f, const char *fmt, ...)
 	va_end(vp);
 
 	return file_put(f, buf);
+}
+
+
+/*
+ * Format and translate a string, then print it out to file.
+ */
+bool x_file_putf(ang_file *f, int encoding, const char *fmt, ...)
+{
+	va_list vp;
+
+ 	char buf[1024];
+
+ 	/* Begin the Varargs Stuff */
+ 	va_start(vp, fmt);
+
+ 	/* Format the args, save the length */
+ 	(void)vstrnfmt(buf, sizeof(buf), fmt, vp);
+
+ 	/* End the Varargs Stuff */
+ 	va_end(vp);
+
+ 	/* Translate*/
+ 	xstr_trans(buf, encoding);
+
+ 	return file_put(f, buf);
 }
 
 

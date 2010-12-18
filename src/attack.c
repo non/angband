@@ -839,7 +839,9 @@ void textui_cmd_fire_at_nearest(void)
 	}
 
 	/* Fire! */
-	cmd_insert(CMD_FIRE, item, dir);
+	cmd_insert(CMD_FIRE);
+	cmd_set_arg_item(cmd_get_top(), 0, item);
+	cmd_set_arg_target(cmd_get_top(), 1, dir);
 }
 
 /*
@@ -1110,7 +1112,7 @@ void do_cmd_throw(cmd_code code, cmd_arg args[])
 				/* XXX Eddie This is messed up, better done for firing, */
 				/* should use that method [split last] instead */
 				/* check if inven_optimize removed what o_ptr referenced */
-				if (object_similar(i_ptr, o_ptr))
+				if (object_similar(i_ptr, o_ptr, OSTACK_PACK))
 					object_notice_attack_plusses(o_ptr);
 				object_notice_attack_plusses(i_ptr);
 
@@ -1166,7 +1168,7 @@ void textui_cmd_throw(void)
 	/* Get an item */
 	q = "Throw which item? ";
 	s = "You have nothing to throw.";
-	if (!get_item(&item, q, s, 't', (USE_EQUIP | USE_INVEN | USE_FLOOR))) return;
+	if (!get_item(&item, q, s, CMD_THROW, (USE_EQUIP | USE_INVEN | USE_FLOOR))) return;
 
 	if (item >= INVEN_WIELD && item < QUIVER_START)
 	{
@@ -1177,5 +1179,7 @@ void textui_cmd_throw(void)
 	/* Get a direction (or cancel) */
 	if (!get_aim_dir(&dir)) return;
 
-	cmd_insert(CMD_THROW, item, dir);
+	cmd_insert(CMD_THROW);
+	cmd_set_arg_item(cmd_get_top(), 0, item);
+	cmd_set_arg_target(cmd_get_top(), 1, dir);
 }

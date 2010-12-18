@@ -21,6 +21,7 @@
 #include "generate.h"
 #include "history.h"
 #include "object/tvalsval.h"
+#include "object/object.h"
 #include "target.h"
 
 /*
@@ -732,9 +733,11 @@ void display_monlist(void)
 			list[order[i]].los, list[order[i]].los_asleep);
 
 		/* Display the pict */
-		Term_putch(cur_x++, line, list[order[i]].attr, r_ptr->x_char);
-		if (use_bigtile) Term_putch(cur_x++, line, 255, -1);
-		Term_putch(cur_x++, line, TERM_WHITE, ' ');
+		if ((tile_width == 1) && (tile_height == 1))
+		{
+		        Term_putch(cur_x++, line, list[order[i]].attr, r_ptr->x_char);
+			Term_putch(cur_x++, line, TERM_WHITE, ' ');
+		}
 
 		/* Print and bump line counter */
 		c_prt(attr, buf, line, cur_x);
@@ -805,9 +808,11 @@ void display_monlist(void)
 			list[order[i]].asleep);
 
 		/* Display the pict */
-		Term_putch(cur_x++, line, list[order[i]].attr, r_ptr->x_char);
-		if (use_bigtile) Term_putch(cur_x++, line, 255, -1);
-		Term_putch(cur_x++, line, TERM_WHITE, ' ');
+		if ((tile_width == 1) && (tile_height == 1))
+		{
+		        Term_putch(cur_x++, line, list[order[i]].attr, r_ptr->x_char);
+			Term_putch(cur_x++, line, TERM_WHITE, ' ');
+		}
 
 		/* Print and bump line counter */
 		c_prt(attr, buf, line, cur_x);
@@ -1439,7 +1444,7 @@ s16b monster_carry(int m_idx, object_type *j_ptr)
 		next_o_idx = o_ptr->next_o_idx;
 
 		/* Check for combination */
-		if (object_similar(o_ptr, j_ptr))
+		if (object_similar(o_ptr, j_ptr, OSTACK_MONSTER))
 		{
 			/* Combine the items */
 			object_absorb(o_ptr, j_ptr);

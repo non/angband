@@ -20,6 +20,7 @@
 #include "button.h"
 #include "game-event.h"
 #include "macro.h"
+#include "cmds.h"
 
 /*
  * Convert a decimal to a single digit hex number
@@ -1588,6 +1589,10 @@ void screen_load(void)
 
 	/* Decrease "icky" depth */
 	character_icky--;
+
+	/* Mega hack -redraw big graphics - sorry NRM */
+	if (character_icky == 0 && (tile_width > 1 || tile_height > 1))
+		do_cmd_redraw();
 }
 
 
@@ -1662,7 +1667,10 @@ void text_out_to_screen(byte a, cptr str)
 	int wrap;
 
 	cptr s;
+	char buf[1024];
 
+	/* We use either ascii or system-specific encoding */
+	int encoding = (OPT(xchars_to_file)) ? SYSTEM_SPECIFIC : ASCII;
 
 	/* Obtain the size */
 	(void)Term_get_size(&wid, &h);
@@ -1670,6 +1678,12 @@ void text_out_to_screen(byte a, cptr str)
 	/* Obtain the cursor */
 	(void)Term_locate(&x, &y);
 
+	/* Copy to a rewriteable string */
+	my_strcpy(buf, str, 1024);
+	
+	/* Translate it to 7-bit ASCII or system-specific format */
+	xstr_trans(buf, encoding);
+	
 	/* Use special wrapping boundary? */
 	if ((text_out_wrap > 0) && (text_out_wrap < wid))
 		wrap = text_out_wrap;
@@ -1677,7 +1691,7 @@ void text_out_to_screen(byte a, cptr str)
 		wrap = wid;
 
 	/* Process the string */
-	for (s = str; *s; s++)
+	for (s = buf; *s; s++)
 	{
 		char ch;
 
@@ -1698,7 +1712,7 @@ void text_out_to_screen(byte a, cptr str)
 		}
 
 		/* Clean up the char */
-		ch = (isprint((unsigned char)*s) ? *s : ' ');
+		ch = (my_isprint((unsigned char)*s) ? *s : ' ');
 
 		/* Wrap words as needed */
 		if ((x >= wrap - 1) && (ch != ' '))
@@ -1776,17 +1790,29 @@ void text_out_to_screen(byte a, cptr str)
  */
 void text_out_to_file(byte a, cptr str)
 {
+	cptr s;
+	char buf[1024];
+
 	/* Current position on the line */
 	static int pos = 0;
 
 	/* Wrap width */
 	int wrap = (text_out_wrap ? text_out_wrap : 75);
 
-	/* Current location within "str" */
-	cptr s = str;
+	/* We use either ascii or system-specific encoding */
+ 	int encoding = OPT(xchars_to_file) ? SYSTEM_SPECIFIC : ASCII;
 
 	/* Unused parameter */
 	(void)a;
+
+	/* Copy to a rewriteable string */
+ 	my_strcpy(buf, str, 1024);
+
+ 	/* Translate it to 7-bit ASCII or system-specific format */
+ 	xstr_trans(buf, encoding);
+
+	/* Current location within "buf" */
+ 	s = buf;
 
 	/* Process the string */
 	while (*s)
@@ -1856,7 +1882,7 @@ void text_out_to_file(byte a, cptr str)
 		for (n = 0; n < len; n++)
 		{
 			/* Ensure the character is printable */
-			ch = (isprint((unsigned char) s[n]) ? s[n] : ' ');
+			ch = (my_isprint((unsigned char) s[n]) ? s[n] : ' ');
 
 			/* Write out the character */
 			file_writec(text_out_file, ch);
@@ -2172,7 +2198,7 @@ bool askfor_aux_keypress(char *buf, size_t buflen, size_t *curs, size_t *len, ch
 			bool atnull = (buf[*curs] == 0);
 
 
-			if (!isprint((unsigned char)keypress))
+			if (!my_isprint((unsigned char)keypress))
 			{
 				bell("Illegal edit key!");
 				break;
@@ -2391,6 +2417,9 @@ bool get_string(cptr prompt, char *buf, size_t len)
 
 	/* Ask the user for a string */
 	res = askfor_aux(buf, len, NULL);
+
+	/* Translate it to 8-bit (Latin-1) */
+ 	xstr_trans(buf, LATIN1);
 
 	/* Clear prompt */
 	prt("", 0, 0);

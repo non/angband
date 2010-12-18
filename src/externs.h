@@ -32,12 +32,15 @@ extern cptr stat_names_full[A_MAX];
 extern const char *window_flag_desc[32];
 extern const char *inscrip_text[];
 extern const grouper object_text_order[];
+extern const byte char_tables[256][CHAR_TABLE_SLOTS];
+extern const xchar_type latin1_encode[];
 
 /* variable.c */
 extern cptr copyright;
 extern bool arg_wizard;
 extern bool arg_rebalance;
 extern int arg_graphics;
+extern bool arg_graphics_nice;
 extern bool character_generated;
 extern bool character_existed;
 extern bool character_dungeon;
@@ -52,7 +55,7 @@ extern char summon_kin_type;
 extern s32b turn;
 extern s32b old_turn;
 extern int use_graphics;
-extern bool use_bigtile;
+extern bool use_graphics_nice;
 extern s16b signal_count;
 extern bool msg_flag;
 extern bool inkey_base;
@@ -181,6 +184,15 @@ extern bool search(bool verbose);
 extern byte py_pickup(int pickup);
 extern void move_player(int dir);
 
+/* cmd2.c */
+/* XXX should probably be moved to cave.c? */
+bool is_open(int feat);
+bool is_closed(int feat);
+bool is_trap(int feat);
+int count_feats(int *y, int *x, bool (*test)(int feat), bool under);
+int count_chests(int *y, int *x, bool trapped);
+int coords_to_dir(int y, int x);
+
 /* death.c */
 void death_screen(void);
 
@@ -284,6 +296,13 @@ extern cptr attr_to_text(byte a);
 extern void build_gamma_table(int gamma);
 extern byte gamma_table[256];
 #endif /* SUPPORT_GAMMA */
+
+/* x-char.c */
+extern void xchar_trans_hook(char *s, int encoding);
+extern void xstr_trans(char *str, int encoding);
+extern void escape_latin1(char *dest, size_t max, cptr src);
+extern const char seven_bit_translation[128];
+extern char xchar_trans(byte c);
 
 /* xtra2.c */
 void check_experience(void);

@@ -214,76 +214,39 @@ static int feat_order(int feat)
 
 
 /* Emit a 'graphical' symbol and a padding character if appropriate */
-static void big_pad(int col, int row, byte a, byte c)
+extern void big_pad(int col, int row, byte a, byte c)
 {
 	Term_putch(col, row, a, c);
-	if (!use_bigtile) return;
 
-	if (a & 0x80)
-		Term_putch(col + 1, row, 255, -1);
-	else
-		Term_putch(col + 1, row, 1, ' ');
+	if ((tile_width > 1) || (tile_height > 1))
+	{
+	        Term_big_putch(col, row, a, c);
+	}
 }
 
 /* Return the actual width of a symbol */
 static int actual_width(int width)
 {
-#ifdef UNANGBAND
-	if (use_trptile) width *= 3;
-	else if (use_dbltile) width *= 2;
-#endif
-
-	if (use_bigtile) width *= 2;
-
-	return width;
+	return width * tile_width;
 }
 
 /* Return the actual height of a symbol */
 static int actual_height(int height)
 {
-#ifdef UNANGBAND
-	if (use_trptile) height = height * 3 / 2;
-	else if (use_dbltile) height *= 2;
-#endif
-
-	if (use_bigtile) height *= 2;
-
-	return height;
+	return height * tile_height;
 }
 
 
 /* From an actual width, return the logical width */
 static int logical_width(int width)
 {
-	int divider = 1;
-
-#ifdef UNANGBAND
-	if (use_trptile) divider = 3;
-	else if (use_dbltile) divider = 2;
-#endif
-
-	if (use_bigtile) divider *= 2;
-
-	return width / divider;
+	return width / tile_width;
 }
 
 /* From an actual height, return the logical height */
 static int logical_height(int height)
 {
-	int divider = 1;
-
-#ifdef UNANGBAND
-	if (use_trptile)
-	{
-		height *= 2;
-		divider = 3;
-	}
-	else if (use_dbltile) divider = 2;
-#endif
-
-	if (use_bigtile) divider *= 2;
-
-	return height / divider;
+	return height / tile_height;
 }
 
 
@@ -516,8 +479,6 @@ static void display_knowledge(const char *title, int *obj_list, int o_count,
 			if (visual_list) pvs = ", ENTER to accept";
 			else if (o_funcs.xattr) pvs = ", 'v' for visuals";
 
-
-
 			prt(format("<dir>%s%s%s, ESC", pvs, pedit, xtra), hgt - 1, 0);
 		}
 
@@ -532,7 +493,7 @@ static void display_knowledge(const char *title, int *obj_list, int o_count,
 		if (g_funcs.summary && !visual_list)
 		{
 			g_funcs.summary(g_cur, obj_list, g_o_count, g_offset[g_cur],
-			                object_menu.boundary.row + object_menu.boundary.page_rows,
+			                object_menu.active.row + object_menu.active.page_rows,
 			                object_region.col);
 		}
 
@@ -543,6 +504,7 @@ static void display_knowledge(const char *title, int *obj_list, int o_count,
 
 		if (visual_list)
 		{
+		        bigcurs = TRUE;
 			display_visual_list(g_name_len + 3, 7, browser_rows-1,
 			                             wid - (g_name_len + 3), attr_top, char_left);
 			place_visual_list_cursor(g_name_len + 3, 7, *o_funcs.xattr(oid), 
@@ -676,6 +638,7 @@ static void display_visual_list(int col, int row, int height, int width, byte at
 			Term_erase(col, row + i, width);
 
 	width = logical_width(width);
+	height = logical_height(height);
 
 	/* Display lines until done */
 	for (i = 0; i < height; i++)
@@ -686,7 +649,7 @@ static void display_visual_list(int col, int row, int height, int width, byte at
 			byte a;
 			unsigned char c;
 			int x = col + actual_width(j);
-			int y = row + actual_width(i);
+			int y = row + actual_height(i);
 			int ia, ic;
 
 			ia = attr_top + i;
@@ -719,6 +682,25 @@ static void place_visual_list_cursor(int col, int row, byte a, byte c, byte attr
 
 
 /*
+ * Remove the visual list and clear the screen 
+ */
+static void remove_visual_list(int col, int row, bool *visual_list_ptr, int width, int height)
+{
+	int i;
+
+	/* No more big cursor */
+	bigcurs = FALSE;
+
+	/* Cancel visual list */
+	*visual_list_ptr = FALSE;
+
+	/* Clear the display lines */
+	for (i = 0; i < height; i++)
+	        Term_erase(col, row + i, width);
+
+}
+
+/*
  *  Do visual mode command -- Change symbols
  */
 static bool visual_mode_command(ui_event_data ke, bool *visual_list_ptr,
@@ -747,7 +729,7 @@ static bool visual_mode_command(ui_event_data ke, bool *visual_list_ptr,
 				/* Cancel change */
 				*cur_attr_ptr = attr_old;
 				*cur_char_ptr = char_old;
-				*visual_list_ptr = FALSE;
+				remove_visual_list(col, row, visual_list_ptr, width, height);
 
 				return TRUE;
 			}
@@ -761,7 +743,7 @@ static bool visual_mode_command(ui_event_data ke, bool *visual_list_ptr,
 			if (*visual_list_ptr)
 			{
 				/* Accept change */
-				*visual_list_ptr = FALSE;
+			  remove_visual_list(col, row, visual_list_ptr, width, height);
 				return TRUE;
 			}
 
@@ -774,6 +756,7 @@ static bool visual_mode_command(ui_event_data ke, bool *visual_list_ptr,
 			if (!*visual_list_ptr)
 			{
 				*visual_list_ptr = TRUE;
+				bigcurs = TRUE;
 
 				*attr_top_ptr = (byte)MAX(0, (int)*cur_attr_ptr - frame_top);
 				*char_left_ptr = (char)MAX(0, (int)*cur_char_ptr - frame_left);
@@ -786,7 +769,7 @@ static bool visual_mode_command(ui_event_data ke, bool *visual_list_ptr,
 				/* Cancel change */
 				*cur_attr_ptr = attr_old;
 				*cur_char_ptr = char_old;
-				*visual_list_ptr = FALSE;
+				remove_visual_list(col, row, visual_list_ptr, width, height);
 			}
 
 			return TRUE;
@@ -832,6 +815,8 @@ static bool visual_mode_command(ui_event_data ke, bool *visual_list_ptr,
 				byte a = *cur_attr_ptr;
 				byte c = *cur_char_ptr;
 
+				bigcurs = TRUE;
+
 				/* Get mouse movement */
 				if (ke.type == EVT_MOUSE)
 				{
@@ -863,7 +848,8 @@ static bool visual_mode_command(ui_event_data ke, bool *visual_list_ptr,
 						*delay = 100;
 
 						/* Accept change */
-						if (ke.index) *visual_list_ptr = FALSE;
+						if (ke.index) 
+						  remove_visual_list(col, row, visual_list_ptr, width, height);
 
 						return TRUE;
 					}
@@ -873,7 +859,7 @@ static bool visual_mode_command(ui_event_data ke, bool *visual_list_ptr,
 					{
 						*cur_attr_ptr = attr_old;
 						*cur_char_ptr = char_old;
-						*visual_list_ptr = FALSE;
+						remove_visual_list(col, row, visual_list_ptr, width, height);
 
 						return TRUE;
 					}
@@ -948,10 +934,8 @@ static void display_monster(int col, int row, bool cursor, int oid)
 	/* Display the name */
 	c_prt(attr, r_ptr->name, row, col);
 
-#ifdef UNANGBAND
-	if (use_dbltile || use_trptile)
+	if ((tile_width > 1) || (tile_height > 1))
 		return;
-#endif
 
 	/* Display symbol */
 	big_pad(66, row, a, c);
@@ -1135,16 +1119,12 @@ static void do_cmd_knowledge_monsters(const char *name, int row)
 
 static void get_artifact_display_name(char *o_name, size_t namelen, int a_idx)
 {
-	object_type object_type_body;
+	object_type object_type_body = { 0 };
 	object_type *o_ptr = &object_type_body;
 
-	/* Make fake artifact */
-	o_ptr = &object_type_body;
-	object_wipe(o_ptr);
 	make_fake_artifact(o_ptr, a_idx);
-
-	/* Get its name */
-	object_desc(o_name, namelen, o_ptr, ODESC_PREFIX | ODESC_BASE | ODESC_SPOIL);
+	object_desc(o_name, namelen, o_ptr,
+			ODESC_PREFIX | ODESC_BASE | ODESC_SPOIL);
 }
 
 /*
@@ -1152,15 +1132,41 @@ static void get_artifact_display_name(char *o_name, size_t namelen, int a_idx)
  */
 static void display_artifact(int col, int row, bool cursor, int oid)
 {
-	char o_name[80];
-
-	/* Choose a color */
 	byte attr = curs_attrs[CURS_KNOWN][(int)cursor];
+	char o_name[80];
 
 	get_artifact_display_name(o_name, sizeof o_name, oid);
 
-	/* Display the name */
 	c_prt(attr, o_name, row, col);
+}
+
+static object_type *find_artifact(int a_idx)
+{
+	int i, j;
+
+	/* Look for the artifact, either in inventory, store or the object list */
+	for (i = 0; i < z_info->o_max; i++)
+	{
+		if (o_list[i].name1 == a_idx)
+			return &o_list[i];
+	}
+
+	for (i = 0; i < INVEN_TOTAL; i++)
+	{
+		if (p_ptr->inventory[i].name1 == a_idx)
+			return &p_ptr->inventory[i];
+	}
+
+	for (j = 1; j < (FEAT_SHOP_TAIL - FEAT_SHOP_HEAD + 1); j++)
+	{
+		for (i = 0; i < store[j].stock_size; i++)
+		{
+			if (store[j].stock[i].name1 == a_idx)
+				return &store[j].stock[i];
+		}
+	}
+
+	return NULL;
 }
 
 /*
@@ -1169,87 +1175,44 @@ static void display_artifact(int col, int row, bool cursor, int oid)
 static void desc_art_fake(int a_idx)
 {
 	object_type *o_ptr;
-	object_type object_type_body;
-	bool lost = TRUE, abil = FALSE;
-	int i, j;
-	oinfo_detail_t mode = OINFO_NONE;
+	object_type object_type_body = { 0 };
 
-	/* Get local object */
-	o_ptr = &object_type_body;
+	char header[120];
 
-	/* Wipe the object */
-	object_wipe(o_ptr);
+	textblock *tb;
+	region area = { 0, 0, 0, 0 };
 
-	/* Look for the artifact, either in inventory, store or the object list */
-	for (i = 0; i < z_info->o_max; i++)
-	{
-		if (o_list[i].name1 == a_idx)
-		{
-			o_ptr = &o_list[i];
-			lost = FALSE;
-			break;
-		}
-	}
-
-	if (lost)
-	{
-		for (i = 0; i < INVEN_TOTAL; i++)
-		{
-			if (p_ptr->inventory[i].name1 == a_idx)
-			{
-				o_ptr = &p_ptr->inventory[i];
-				lost = FALSE;
-				break;
-			}
-		}
-	}
-
-	if (lost)
-	{
-		for (j = 1; j < (FEAT_SHOP_TAIL - FEAT_SHOP_HEAD + 1); j++)
-		{
-			for (i = 0; i < store[j].stock_size; i++)
-			{
-				if (store[j].stock[i].name1 == a_idx)
-				{
-					o_ptr = &store[j].stock[i];
-					lost = FALSE;
-					break;
-				}
-			}
-			if (!lost) break;
-		}
-	}
+	o_ptr = find_artifact(a_idx);
 
 	/* If it's been lost, make a fake artifact for it */
-	if (lost)
+	if (!o_ptr)
 	{
+		o_ptr = &object_type_body;
+
 		make_fake_artifact(o_ptr, a_idx);
 		o_ptr->ident |= IDENT_NAME;
 
 		/* Check the history entry, to see if it was fully known before it
 		 * was lost */
 		if (history_is_artifact_known(a_idx))
-			mode = OINFO_FULL;
+		{
+			object_notice_everything(o_ptr);
+		}
 	}
 
 	/* Hack -- Handle stuff */
 	handle_stuff();
 
-	text_out_hook = text_out_to_screen;
-	screen_save();
+	tb = object_info(o_ptr, OINFO_NONE);
+	object_desc(header, sizeof(header), o_ptr, ODESC_PREFIX | ODESC_FULL);
 
-	/* Print the artifact information */
-	Term_gotoxy(0, 0);
-	object_info_header(o_ptr);
-	abil = object_info(o_ptr, mode);
+	textui_textblock_show(tb, area, format("%^s", header));
+	textblock_free(tb);
+
+#if 0
+	/* XXX This should be in object_info */
 	if (lost) text_out("\nThis artifact has been lost.");
-	if (!abil) text_out("\n\nThis item does not seem to possess any special abilities.");
-
-	text_out_c(TERM_L_BLUE, "\n\n[Press any key to continue]\n");
-	(void)anykey();
-
-	screen_load();
+#endif
 }
 
 static int a_cmp_tval(const void *a, const void *b)
@@ -1257,7 +1220,7 @@ static int a_cmp_tval(const void *a, const void *b)
 	const artifact_type *a_a = &a_info[*(const int *)a];
 	const artifact_type *a_b = &a_info[*(const int *)b];
 
-	/*group by */
+	/* group by */
 	int ta = obj_group_order[a_a->tval];
 	int tb = obj_group_order[a_b->tval];
 	int c = ta - tb;
@@ -1275,39 +1238,21 @@ static int art2gid(int oid) { return obj_group_order[a_info[oid].tval]; }
 /* Check if the given artifact idx is something we should "Know" about */
 static bool artifact_is_known(int a_idx)
 {
-	int i;
+	object_type *o_ptr;
 
-	if (p_ptr->wizard) return TRUE;
+	if (!a_info[a_idx].name)
+		return FALSE;
 
-	/* Artifact doesn't exist at all, or not created yet */
-	if (!a_info[a_idx].name || a_info[a_idx].created == FALSE) return FALSE;
+	if (p_ptr->wizard)
+		return TRUE;
+
+	if (!a_info[a_idx].created)
+		return FALSE;
 
 	/* Check all objects to see if it exists but hasn't been IDed */
-	for (i = 0; i < z_info->o_max; i++)
-	{
-		int a = o_list[i].name1;
-
-		/* If we haven't actually sensed the artifact yet */
-		if (a && a == a_idx && !object_is_known_artifact(&o_list[i]))
-		{
-			return FALSE;
-		}
-	}
-
-    /* Check inventory for the same */
-	for (i = 0; i < INVEN_TOTAL; i++)
-	{
-		object_type *o_ptr = &p_ptr->inventory[i];
-
-		/* Ignore non-objects */
-		if (!o_ptr->k_idx) continue;
-
-		if (o_ptr->name1 && o_ptr->name1 == a_idx &&
-		    !object_is_known_artifact(o_ptr))
-		{
-			return FALSE;
-		}
-	}
+	o_ptr = find_artifact(a_idx);
+	if (o_ptr && !object_is_known_artifact(o_ptr))
+		return FALSE;
 
 	return TRUE;
 }
@@ -1384,63 +1329,17 @@ static void display_ego_item(int col, int row, bool cursor, int oid)
  */
 static void desc_ego_fake(int oid)
 {
-	/* Hack: dereference the join */
-	const char *cursed[] = { "permanently cursed", "heavily cursed", "cursed" };
-	const char *xtra[] = { "sustain", "higher resistance", "ability" };
-	int i;
-
 	int e_idx = default_join[oid].oid;
-	ego_item_type *e_ptr = &e_info[e_idx];
+	struct ego_item *ego = &e_info[e_idx];
 
-	object_type dummy;
-	WIPE(&dummy, dummy);
-
-	/* Save screen */
-	screen_save();
-
-	/* Set text_out hook */
-	text_out_hook = text_out_to_screen;
-
-	/* Dump the name */
-	c_prt(TERM_L_BLUE, format("%s %s", ego_grp_name(default_group(oid)),
-	                                   e_ptr->name), 0, 0);
-
-	/* Begin recall */
-	Term_gotoxy(0, 1);
-	text_out("\n");
-
-	if (e_ptr->text)
-	{
-		int x, y;
-		text_out("%s", e_ptr->text);
-		Term_locate(&x, &y);
-		Term_gotoxy(0, y+1);
-	}
+	textblock *tb;
+	region area = { 0, 0, 0, 0 };
 
 	/* List ego flags */
-	dummy.name2 = e_idx;
-	dummy.tval = e_ptr->tval[0];
-	object_info(&dummy, OINFO_FULL | OINFO_DUMMY);
+	tb = object_info_ego(ego);
 
-	if (e_ptr->xtra)
-		text_out(format("It provides one random %s.", xtra[e_ptr->xtra - 1]));
-
-	if (flags_test(e_ptr->flags, OF_SIZE, OF_CURSE_MASK, FLAG_END))
-	{
-		if (of_has(e_ptr->flags, OF_PERMA_CURSE))
-			i = 0;
-		else if (of_has(e_ptr->flags, OF_PERMA_CURSE))
-			i = 1;
-		else
-			i = 2;
-
-		text_out_c(TERM_RED, format("It is %s.", cursed[i]));
-	}
-
-	text_out_c(TERM_L_BLUE, "\n\n[Press any key to continue]\n");
-	(void)anykey();
-
-	screen_load();
+	textui_textblock_show(tb, area, format("%s %s", ego_grp_name(default_group(oid)), ego->name));
+	textblock_free(tb);
 }
 
 /* TODO? Currently ego items will order by e_idx */
@@ -1578,11 +1477,9 @@ static void display_object(int col, int row, bool cursor, int oid)
 	if (aware && inscrip)
 		c_put_str(TERM_YELLOW, inscrip, row, 55);
 
-#ifdef UNANGBAND
 	/* Hack - don't use if double tile */
-	if (use_dbltile || use_trptile)
+	if ((tile_width > 1) || (tile_height > 1))
 		return;
-#endif
 
 	/* Display symbol */
 	big_pad(76, row, a, c);
@@ -1596,6 +1493,11 @@ static void desc_obj_fake(int k_idx)
 	object_kind *k_ptr = &k_info[k_idx];
 	object_type object_type_body;
 	object_type *o_ptr = &object_type_body;
+
+	char header[120];
+
+	textblock *tb;
+	region area = { 0, 0, 0, 0 };
 
 	/* Check for known artifacts, display them as artifacts */
 	if (of_has(k_ptr->flags, OF_INSTA_ART) && artifact_is_known(get_artifact_from_kind(k_ptr)))
@@ -1623,19 +1525,11 @@ static void desc_obj_fake(int k_idx)
 	/* Hack -- Handle stuff */
 	handle_stuff();
 
-	/* Describe */
-	text_out_hook = text_out_to_screen;
-	screen_save();
+	tb = object_info(o_ptr, OINFO_NONE);
+	object_desc(header, sizeof(header), o_ptr, ODESC_PREFIX | ODESC_FULL);
 
-	Term_gotoxy(0,0);
-	object_info_header(o_ptr);
-	if (!object_info(o_ptr, OINFO_NONE))
-		text_out("\n\nThis item does not seem to possess any special abilities.");
-
-	text_out_c(TERM_L_BLUE, "\n\n[Press any key to continue]\n");
-	(void)anykey();
-
-	screen_load();
+	textui_textblock_show(tb, area, format("%^s", header));
+	textblock_free(tb);
 }
 
 static int o_cmp_tval(const void *a, const void *b)
@@ -1810,13 +1704,21 @@ void textui_browse_object_knowledge(const char *name, int row)
 	int *objects;
 	int o_count = 0;
 	int i;
+	object_kind *k_ptr;
 
 	objects = C_ZNEW(z_info->k_max, int);
 
 	for (i = 0; i < z_info->k_max; i++)
 	{
-		if ((k_info[i].everseen || k_info[i].flavor || OPT(cheat_xtra)) &&
-				!of_has(k_info[i].flags, OF_INSTA_ART))
+		k_ptr = &k_info[i];
+		/* It's in the list if we've ever seen it, or it has a flavour,
+		 * and either it's not one of the special artifacts, or if it is,
+		 * we're not aware of it yet. This way the flavour appears in the list
+		 * until it is found.
+		 */
+		if ((k_ptr->everseen || k_ptr->flavor || OPT(cheat_xtra)) &&
+				(!of_has(k_ptr->flags, OF_INSTA_ART) ||
+				 !artifact_is_known(get_artifact_from_kind(k_ptr))))
 		{
 			int c = obj_group_order[k_info[i].tval];
 			if (c >= 0) objects[o_count++] = i;
@@ -1848,9 +1750,7 @@ static void display_feature(int col, int row, bool cursor, int oid )
 	/* Display the name */
 	c_prt(attr, f_ptr->name, row, col);
 
-#ifdef UNANGBAND
-	if (use_dbltile || use_trptile) return;
-#endif
+	if ((tile_width > 1) || (tile_height > 1)) return;
 
 	/* Display symbol */
 	big_pad(68, row, f_ptr->x_attr, f_ptr->x_char);

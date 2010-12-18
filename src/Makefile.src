@@ -29,6 +29,7 @@ HEADERS = \
 	ui.h \
 	ui-menu.h \
 	wizard.h \
+	x-char.h \
 	z-bitflag.h \
 	z-file.h \
 	z-form.h \
@@ -47,7 +48,7 @@ GTKHEADERS = \
 ZFILES = z-bitflag.o z-file.o z-form.o z-msg.o z-quark.o z-rand.o z-term.o z-type.o \
          z-util.o z-virt.o z-textblock.o
 MAINFILES = main.o main-crb.o main-gcu.o $(GTKMAINFILES) \
-            main-ros.o main-sdl.o main-win.o main-x11.o snd-sdl.o main-test.o
+            main-sdl.o main-win.o main-x11.o snd-sdl.o main-test.o
 
 GTKMAINFILES = \
 	gtk/main-gtk.o \
@@ -122,6 +123,7 @@ ANGFILES = \
 	wiz-spoil.o \
 	wiz-stats.o \
 	wizard.o \
+	x-char.o \
 	x-spell.o \
 	xtra2.o \
 	xtra3.o

@@ -146,7 +146,10 @@ static void display_player_equippy(int y, int x)
 		c = object_char(o_ptr);
 
 		/* Dump */
-		Term_putch(x+i-INVEN_WIELD, y, a, c);
+		if ((tile_width == 1) && (tile_height == 1))
+		{
+		        Term_putch(x+i-INVEN_WIELD, y, a, c);
+		}
 	}
 }
 
@@ -954,8 +957,12 @@ errr file_character(const char *path, bool full)
 
 	char o_name[80];
 
+	byte (*old_xchar_hook)(byte c) = Term->xchar_hook;
+
 	char buf[1024];
 
+	/* We use either ascii or system-specific encoding */
+ 	int encoding = OPT(xchars_to_file) ? SYSTEM_SPECIFIC : ASCII;
 
 	/* Unused parameter */
 	(void)full;
@@ -965,9 +972,8 @@ errr file_character(const char *path, bool full)
 	fp = file_open(path, MODE_WRITE, FTYPE_TEXT);
 	if (!fp) return (-1);
 
-
-	text_out_hook = text_out_to_file;
-	text_out_file = fp;
+	/* Display the requested encoding -- ASCII or system-specific */
+ 	if (!OPT(xchars_to_file)) Term->xchar_hook = NULL;
 
 	/* Begin dump */
 	file_putf(fp, "  [%s %s Character Dump]\n\n",
@@ -997,7 +1003,7 @@ errr file_character(const char *path, bool full)
 		buf[x] = '\0';
 
 		/* End the row */
-		file_putf(fp, "%s\n", buf);
+		x_file_putf(fp, encoding, "%s\n", buf);
 	}
 
 	/* Skip a line */
@@ -1026,7 +1032,7 @@ errr file_character(const char *path, bool full)
 		buf[x] = '\0';
 
 		/* End the row */
-		file_putf(fp, "%s\n", buf);
+		x_file_putf(fp, encoding, "%s\n", buf);
 	}
 
 	/* Skip a line */
@@ -1052,7 +1058,7 @@ errr file_character(const char *path, bool full)
 		buf[x] = '\0';
 
 		/* End the row */
-		file_putf(fp, "%s\n", buf);
+		x_file_putf(fp, encoding, "%s\n", buf);
 	}
 
 	/* Skip some lines */
@@ -1067,15 +1073,11 @@ errr file_character(const char *path, bool full)
 		file_putf(fp, "  [Last Messages]\n\n");
 		while (i-- > 0)
 		{
-			file_putf(fp, "> %s\n", message_str((s16b)i));
+			x_file_putf(fp, encoding, "> %s\n", message_str((s16b)i));
 		}
-		file_putf(fp, "\nKilled by %s.\n\n", p_ptr->died_from);
+		x_file_putf(fp, encoding, "\nKilled by %s.\n\n", p_ptr->died_from);
 	}
 
-
-	/* Set the indent/wrap */
-	text_out_indent = 5;
-	text_out_wrap = 72;
 
 	/* Dump the equipment */
 	file_putf(fp, "  [Character Equipment]\n\n");
@@ -1089,9 +1091,9 @@ errr file_character(const char *path, bool full)
 		object_desc(o_name, sizeof(o_name), &p_ptr->inventory[i],
 				ODESC_PREFIX | ODESC_FULL);
 
-		file_putf(fp, "%c) %s\n", index_to_label(i), o_name);
+		x_file_putf(fp, encoding, "%c) %s\n", index_to_label(i), o_name);
 		if (p_ptr->inventory[i].k_idx)
-			object_info_chardump(&p_ptr->inventory[i]);
+			object_info_chardump(fp, &p_ptr->inventory[i], 5, 72);
 	}
 
 	/* Dump the inventory */
@@ -1103,8 +1105,8 @@ errr file_character(const char *path, bool full)
 		object_desc(o_name, sizeof(o_name), &p_ptr->inventory[i],
 					ODESC_PREFIX | ODESC_FULL);
 
-		file_putf(fp, "%c) %s\n", index_to_label(i), o_name);
-		object_info_chardump(&p_ptr->inventory[i]);
+		x_file_putf(fp, encoding, "%c) %s\n", index_to_label(i), o_name);
+		object_info_chardump(fp, &p_ptr->inventory[i], 5, 72);
 	}
 	file_putf(fp, "\n\n");
 
@@ -1120,16 +1122,14 @@ errr file_character(const char *path, bool full)
 		{
 			object_desc(o_name, sizeof(o_name), &st_ptr->stock[i],
 						ODESC_PREFIX | ODESC_FULL);
-			file_putf(fp, "%c) %s\n", I2A(i), o_name);
+			x_file_putf(fp, encoding, "%c) %s\n", I2A(i), o_name);
 
-			object_info_chardump(&st_ptr->stock[i]);
+			object_info_chardump(fp, &st_ptr->stock[i], 5, 72);
 		}
 
 		/* Add an empty line */
 		file_putf(fp, "\n\n");
 	}
-
-	text_out_indent = text_out_wrap = 0;
 
 	/* Dump character history */
 	dump_history(fp);
@@ -1152,6 +1152,9 @@ errr file_character(const char *path, bool full)
 
 	/* Skip some lines */
 	file_putf(fp, "\n\n");
+
+	/* Return to standard display */
+ 	Term->xchar_hook = old_xchar_hook;
 
 	file_close(fp);
 

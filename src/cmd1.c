@@ -26,6 +26,7 @@
 #include "monster/monster.h"
 #include "object/inventory.h"
 #include "object/tvalsval.h"
+#include "object/object.h"
 #include "squelch.h"
 #include "trap.h"
 
@@ -306,7 +307,8 @@ static void py_pickup_aux(int o_idx, bool msg)
 		for (i = QUIVER_START; i < QUIVER_END; i++) 
 		{
 			if (!p_ptr->inventory[i].k_idx) continue;
-			if (!object_similar(&p_ptr->inventory[i], o_ptr)) continue;
+			if (!object_similar(&p_ptr->inventory[i], o_ptr,
+				OSTACK_QUIVER)) continue;
 			quiver_slot = i;
 			break;
 		}
@@ -565,7 +567,7 @@ byte py_pickup(int pickup)
 		/* Get an object or exit. */
 		q = "Get which item?";
 		s = "You see nothing there.";
-		if (!get_item(&item, q, s, 'g', USE_FLOOR))
+		if (!get_item(&item, q, s, CMD_PICKUP, USE_FLOOR))
 			return (objs_picked_up);
 
 		this_o_idx = 0 - item;

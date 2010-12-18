@@ -223,7 +223,9 @@ void textui_obj_inscribe(object_type *o_ptr, int item)
 	/* Get a new inscription (possibly empty) */
 	if (get_string("Inscription: ", tmp, sizeof(tmp)))
 	{
-		cmd_insert(CMD_INSCRIBE, item, tmp);
+		cmd_insert(CMD_INSCRIBE);
+		cmd_set_arg_item(cmd_get_top(), 0, item);
+		cmd_set_arg_string(cmd_get_top(), 1, tmp);
 	}
 }
 
@@ -231,19 +233,18 @@ void textui_obj_inscribe(object_type *o_ptr, int item)
 /*** Examination ***/
 void textui_obj_examine(object_type *o_ptr, int item)
 {
+	char header[120];
+
+	textblock *tb;
+	region area = { 0, 0, 0, 0 };
+
 	track_object(item);
 
-	text_out_hook = text_out_to_screen;
-	screen_save();
+	tb = object_info(o_ptr, OINFO_NONE);
+	object_desc(header, sizeof(header), o_ptr, ODESC_PREFIX | ODESC_FULL);
 
-	object_info_header(o_ptr);
-	if (!object_info(o_ptr, OINFO_NONE))
-		text_out("\n\nThis item does not seem to possess any special abilities.");
-
-	text_out_c(TERM_L_BLUE, "\n\n[Press any key to continue]\n");
-	(void)anykey();
-
-	screen_load();
+	textui_textblock_show(tb, area, format("%^s", header));
+	textblock_free(tb);
 }
 
 
@@ -307,7 +308,8 @@ void do_cmd_wield(cmd_code code, cmd_arg args[])
 	}
 
 	/* If the slot is in the quiver and objects can be combined */
-	if (obj_is_ammo(equip_o_ptr) && object_similar(equip_o_ptr, o_ptr))
+	if (obj_is_ammo(equip_o_ptr) && object_similar(equip_o_ptr, o_ptr,
+		OSTACK_QUIVER))
 	{
 		wield_item(o_ptr, item, slot);
 		return;
@@ -361,16 +363,6 @@ void do_cmd_drop(cmd_code code, cmd_arg args[])
 	p_ptr->energy_use = 50;
 }
 
-void textui_obj_drop(object_type *o_ptr, int item)
-{
-	int amt;
-
-	amt = get_quantity(NULL, o_ptr->number);
-	if (amt <= 0) return;
-
-	cmd_insert(CMD_DROP, item, amt);
-}
-
 void textui_obj_wield(object_type *o_ptr, int item)
 {
 	int slot = wield_slot(o_ptr);
@@ -385,19 +377,22 @@ void textui_obj_wield(object_type *o_ptr, int item)
 			cptr q = "Replace which ring? ";
 			cptr s = "Error in obj_wield, please report";
 			item_tester_hook = obj_is_ring;
-			if (!get_item(&slot, q, s, 'w', USE_EQUIP)) return;
+			if (!get_item(&slot, q, s, CMD_WIELD, USE_EQUIP)) return;
 		}
 
-		if (obj_is_ammo(o_ptr) && !object_similar(&p_ptr->inventory[slot], o_ptr))
+		if (obj_is_ammo(o_ptr) && !object_similar(&p_ptr->inventory[slot],
+			o_ptr, OSTACK_QUIVER))
 		{
 			cptr q = "Replace which ammunition? ";
 			cptr s = "Error in obj_wield, please report";
 			item_tester_hook = obj_is_ammo;
-			if (!get_item(&slot, q, s, 'w', USE_EQUIP)) return;
+			if (!get_item(&slot, q, s, CMD_WIELD, USE_EQUIP)) return;
 		}
 	}
 
-	cmd_insert(CMD_WIELD, item, slot);
+	cmd_insert(CMD_WIELD);
+	cmd_set_arg_item(cmd_get_top(), 0, item);
+	cmd_set_arg_number(cmd_get_top(), 1, slot);
 }
 
 

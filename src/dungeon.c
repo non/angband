@@ -1086,6 +1086,10 @@ static void process_player(void)
 
 			/* Get and process a command */
 			process_command(CMD_GAME, FALSE);
+
+			/* Mega hack - redraw if big graphics - sorry NRM */
+			if ((tile_width > 1) || (tile_height > 1)) 
+			        p_ptr->redraw |= (PR_MAP);
 		}
 
 
@@ -1506,6 +1510,10 @@ static void dungeon(void)
 			/* if still alive */
 			if (!p_ptr->leaving)
 			{
+			        /* Mega hack -redraw big graphics - sorry NRM */
+			        if ((tile_width > 1) || (tile_height > 1)) 
+				        p_ptr->redraw |= (PR_MAP);
+
 				/* Process the player */
 				process_player();
 			}
@@ -1778,6 +1786,8 @@ void play_game(void)
 	/* Flash a message */
 	prt("Please wait...", 0, 0);
 
+	/* Allow big cursor */
+	smlcurs = FALSE;
 
 	/* Flush the message */
 	Term_fresh();
@@ -1934,6 +1944,9 @@ void play_game(void)
 		/* Make a new level */
 		generate_cave();
 	}
+
+	/* Disallow big cursor */
+	smlcurs = TRUE;
 
 	/* Tell the UI we're done with the game state */
 	event_signal(EVENT_LEAVE_GAME);

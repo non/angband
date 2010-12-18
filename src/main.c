@@ -25,10 +25,7 @@
  * all the others use this file for their "main()" function.
  */
 
-
-#if defined(WIN32_CONSOLE_MODE) \
-    || (!defined(WINDOWS) && !defined(RISCOS)) \
-    || defined(USE_SDL)
+#if defined(WIN32_CONSOLE_MODE) || !defined(WINDOWS) || defined(USE_SDL)
 
 #include "main.h"
 #include "textui.h"
@@ -371,8 +368,7 @@ int main(int argc, char *argv[])
 			{
 				/* Dump usage information */
 				puts("Usage: angband [options] [-- subopts]");
-				puts("  -n             Start a new character");
-				puts("  -L             Load a new-format save file");
+				puts("  -n             Start a new character (WARNING: overwrites default savefile without -u)");
 				puts("  -w             Resurrect dead character (marks savefile)");
 				puts("  -r             Rebalance monsters");
 				puts("  -g             Request graphics mode");
@@ -405,6 +401,9 @@ int main(int argc, char *argv[])
 	/* Get the file paths */
 	init_stuff();
 
+	/* Install "quit" hook */
+	quit_aux = quit_hook;
+
 	/* Try the modules in the order specified by modules[] */
 	for (i = 0; i < (int)N_ELEMENTS(modules); i++)
 	{
@@ -427,7 +426,7 @@ int main(int argc, char *argv[])
 #ifdef SET_UID
 
 	/* Get the "user name" as a default player name, unless set with -u switch */
-	if(!op_ptr->full_name)
+	if (!op_ptr->full_name[0])
 	{
 		user_name(op_ptr->full_name, sizeof(op_ptr->full_name), player_uid);
 	}
@@ -439,9 +438,6 @@ int main(int argc, char *argv[])
 
 	/* Process the player name */
 	process_player_name(TRUE);
-
-	/* Install "quit" hook */
-	quit_aux = quit_hook;
 
 #ifdef USE_SOUND
 
@@ -477,4 +473,4 @@ int main(int argc, char *argv[])
 	return (0);
 }
 
-#endif /* !defined(MACINTOSH) && !defined(WINDOWS) && !defined(RISCOS) */
+#endif

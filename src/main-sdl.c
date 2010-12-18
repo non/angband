@@ -135,9 +135,9 @@ static char *ANGBAND_DIR_USER_SDL;
 /*
  * Used as 'system' font
  */
-static cptr DEFAULT_FONT_FILE = "6x10.fon";
+static cptr DEFAULT_FONT_FILE = "6x10x.fon";
 
-#define MAX_FONTS 20
+#define MAX_FONTS 40
 char *FontList[MAX_FONTS];
 static int num_fonts = 0;
 
@@ -375,7 +375,7 @@ struct GfxInfo
 
 static SDL_Surface *GfxSurface = NULL;	/* A surface for the graphics */
 
-#define GfxModes 4
+#define GfxModes 5
 static GfxInfo GfxDesc[GfxModes] =
 {
 	/* No gfx (GRAPHICS_NONE) */
@@ -386,12 +386,17 @@ static GfxInfo GfxDesc[GfxModes] =
 	{"16x16", "16x16.png", 16, 16, "new", 0, 65, TRUE},
 	/* XXX (GRAPHICS_DAVID_GERVAIS) */
 	{"32x32", "32x32.png", 32, 32, "david", 0, 0, TRUE},
+	{"8x16", "8x16.png", 16, 16, "nomad", 0, 0, TRUE},
 	
 	/* XXX (GRAPHICS_PSEUDO ???) */
 	/*{NULL, NULL, NULL, -1, -1},	*/						
 };
 
-static int MoreBigtile;				/* Toggle bigtile button */
+
+static int MoreWidthPlus;	/* Increase tile width */
+static int MoreWidthMinus;	/* Decrease tile width */
+static int MoreHeightPlus;	/* Increase tile height */
+static int MoreHeightMinus;	/* Decrease tile height */
 static int GfxButtons[GfxModes];	/* Graphics mode buttons */
 static int SelectedGfx;				/* Current selected gfx */
 #endif
@@ -767,7 +772,7 @@ static void sdl_ButtonVisible(sdl_Button *button, bool visible)
 
 
 /* Maximum amount of buttons in a bank */
-#define MAX_BUTTONS 20
+#define MAX_BUTTONS 40
 
 /*
  * The button_bank package
@@ -1492,6 +1497,7 @@ static void FontActivate(sdl_Button *sender)
 
 #ifdef USE_GRAPHICS
 static errr load_gfx(void);
+static bool do_update = FALSE;
 
 static void SelectGfx(sdl_Button *sender)
 {
@@ -1502,20 +1508,9 @@ static void SelectGfx(sdl_Button *sender)
 static void AcceptChanges(sdl_Button *sender)
 {
 	sdl_Button *button;
-	bool do_update = FALSE;
 	bool do_video_reset = FALSE;
 	
 #ifdef USE_GRAPHICS
-	/* Check to see if bigtile has changed */
-	button = sdl_ButtonBankGet(&PopUp.buttons, MoreBigtile);
-	
-	if (button->tag != use_bigtile)
-	{
-		do_update = TRUE;
-		
-		use_bigtile = !use_bigtile;
-	}
-	
 	if (use_graphics != SelectedGfx)
 	{
 		do_update = TRUE;
@@ -1530,7 +1525,8 @@ static void AcceptChanges(sdl_Button *sender)
 		else
 		{
 			arg_graphics = FALSE;
-			use_bigtile = FALSE;
+			tile_width = 1;
+			tile_height = 1;
 			reset_visuals(TRUE);
 		}
 	}
@@ -1583,6 +1579,8 @@ static void AcceptChanges(sdl_Button *sender)
 		
 		SDL_PushEvent(&Event);
 	}
+
+	do_update = FALSE;
 	
 }
 
@@ -1608,6 +1606,24 @@ static void SnapChange(sdl_Button *sender)
 	PopUp.need_update = TRUE;
 }
 
+#ifdef USE_GRAPHICS
+static void WidthChange(sdl_Button *sender)
+{
+	tile_width += sender->tag;
+	if (tile_width < 1) tile_width = 1;
+	if (tile_width > 6) tile_width = 6;
+	do_update = TRUE;
+}
+
+static void HeightChange(sdl_Button *sender)
+{
+	tile_height += sender->tag;
+	if (tile_height < 1) tile_height = 1;
+	if (tile_height > 3) tile_height = 3;
+	do_update = TRUE;
+}
+#endif
+
 static void MoreDraw(sdl_Window *win)
 {
 	SDL_Rect rc;
@@ -1624,20 +1640,25 @@ static void MoreDraw(sdl_Window *win)
 	
 #ifdef USE_GRAPHICS
 	
-	button = sdl_ButtonBankGet(&win->buttons, MoreBigtile);
-	
 	if (SelectedGfx)
 	{
-		sdl_ButtonVisible(button, TRUE);
-		sdl_WindowText(win, colour, 20, y, "Bigtile is:");
-		
+	        sdl_WindowText(win, colour, 20, y, format("Tile width is %d.", tile_width));
+		button = sdl_ButtonBankGet(&win->buttons, MoreWidthMinus);
 		sdl_ButtonMove(button, 200, y);
 		
+		button = sdl_ButtonBankGet(&win->buttons, MoreWidthPlus);
+		sdl_ButtonMove(button, 230, y);
+
 		y += 20;
-	}
-	else
-	{
-		sdl_ButtonVisible(button, FALSE);
+
+	        sdl_WindowText(win, colour, 20, y, format("Tile height is %d.", tile_height));
+		button = sdl_ButtonBankGet(&win->buttons, MoreHeightMinus);
+		sdl_ButtonMove(button, 200, y);
+		
+		button = sdl_ButtonBankGet(&win->buttons, MoreHeightPlus);
+		sdl_ButtonMove(button, 230, y);
+                
+                y += 20;
 	}
 	
 	
@@ -1692,16 +1713,49 @@ static void MoreActivate(sdl_Button *sender)
 	scolour = SDL_MapRGB(PopUp.surface->format, 210, 110, 110);
 	
 #ifdef USE_GRAPHICS
-	MoreBigtile = sdl_ButtonBankNew(&PopUp.buttons);
-	button = sdl_ButtonBankGet(&PopUp.buttons, MoreBigtile);
+	MoreWidthPlus = sdl_ButtonBankNew(&PopUp.buttons);
+	button = sdl_ButtonBankGet(&PopUp.buttons, MoreWidthPlus);
 	
 	button->unsel_colour = ucolour;
 	button->sel_colour = scolour;
-	sdl_ButtonSize(button, 50 , PopUp.font.height + 2);
+	sdl_ButtonSize(button, 20, PopUp.font.height + 2);
+	sdl_ButtonCaption(button, "+");
+	button->tag = 1;
 	sdl_ButtonVisible(button, TRUE);
-	sdl_ButtonCaption(button, use_bigtile ? "On" : "Off");
-	button->tag = use_bigtile;
-	button->activate = FlipTag;
+	button->activate = WidthChange;
+	
+	MoreWidthMinus = sdl_ButtonBankNew(&PopUp.buttons);
+	button = sdl_ButtonBankGet(&PopUp.buttons, MoreWidthMinus);
+	
+	button->unsel_colour = ucolour;
+	button->sel_colour = scolour;
+	sdl_ButtonSize(button, 20, PopUp.font.height + 2);
+	sdl_ButtonCaption(button, "-");
+	button->tag = -1;
+	sdl_ButtonVisible(button, TRUE);
+	button->activate = WidthChange;
+	
+	MoreHeightPlus = sdl_ButtonBankNew(&PopUp.buttons);
+	button = sdl_ButtonBankGet(&PopUp.buttons, MoreHeightPlus);
+	
+	button->unsel_colour = ucolour;
+	button->sel_colour = scolour;
+	sdl_ButtonSize(button, 20, PopUp.font.height + 2);
+	sdl_ButtonCaption(button, "+");
+	button->tag = 1;
+	sdl_ButtonVisible(button, TRUE);
+	button->activate = HeightChange;
+	
+	MoreHeightMinus = sdl_ButtonBankNew(&PopUp.buttons);
+	button = sdl_ButtonBankGet(&PopUp.buttons, MoreHeightMinus);
+	
+	button->unsel_colour = ucolour;
+	button->sel_colour = scolour;
+	sdl_ButtonSize(button, 20, PopUp.font.height + 2);
+	sdl_ButtonCaption(button, "-");
+	button->tag = -1;
+	sdl_ButtonVisible(button, TRUE);
+	button->activate = HeightChange;
 	
 	SelectedGfx = use_graphics;
 	
@@ -1793,7 +1847,10 @@ static void ResizeWin(term_window* win, int w, int h)
 		
 		/* Oops */
 		if (!win->tile_wid || !win->tile_hgt)
-			quit(format("Unable to find font '%s'.", win->req_font));
+			quit(format("Unable to find font '%s'.\n"
+						"Note that there are new extended font files ending in 'x' in %s.\n"
+					    "Please check %s and edit if necessary.",
+					    win->req_font, ANGBAND_DIR_XTRA_FONT, ANGBAND_DIR_USER_SDL));
 	}
 	
 	/* Get the amount of columns & rows */
@@ -1962,10 +2019,28 @@ static errr load_prefs(void)
 			use_graphics = atoi(s);
 			if (use_graphics) arg_graphics = TRUE;
 		}
+		else if (strstr(buf, "TileWidth"))
+		{
+			tile_width = atoi(s);
+		}
+		else if (strstr(buf, "TileHeight"))
+		{
+			tile_height = atoi(s);
+		}
 		else if (strstr(buf, "Bigtile"))
 		{
-			use_bigtile = atoi(s);
+			tile_width += atoi(s);
 		}
+                else if (strstr(buf, "Dbltile"))
+                {
+			tile_width += tile_width * atoi(s);
+			tile_height += tile_height * atoi(s);
+                }
+                else if (strstr(buf, "Trptile"))
+                {
+			tile_width += 2 * tile_width * atoi(s);
+			tile_height += 2 * tile_height * atoi(s);
+                }
 		else if (strstr(buf, "Window"))
 		{
 			win = &windows[atoi(s)];
@@ -2024,7 +2099,8 @@ static errr save_prefs(void)
 	file_putf(fff, "Resolution = %dx%d\n", screen_w, screen_h);
 	file_putf(fff, "Fullscreen = %d\n", fullscreen);
 	file_putf(fff, "Graphics = %d\n", use_graphics);
-	file_putf(fff, "Bigtile = %d\n\n", use_bigtile);
+	file_putf(fff, "TileWidth = %d\n\n", tile_width);
+        file_putf(fff, "TileHeight = %d\n\n", tile_height);
 	
 	for (i = 0; i < ANGBAND_TERM_MAX; i++)
 	{
@@ -2403,10 +2479,10 @@ static void sdl_keypress(SDL_keysym keysym)
 	SDLKey key_sym = keysym.sym;
 	
 	/* Store the value of various modifier keys */
-	bool mc = (bool)(keysym.mod & (KMOD_CTRL));
-	bool ms = (bool)(keysym.mod & (KMOD_SHIFT));
-	bool ma = (bool)(keysym.mod & (KMOD_ALT));
-	bool mm = (bool)(keysym.mod & (KMOD_META));
+	bool mc = (keysym.mod & (KMOD_CTRL)) > 0;
+	bool ms = (keysym.mod & (KMOD_SHIFT)) > 0;
+	bool ma = (keysym.mod & (KMOD_ALT)) > 0;
+	bool mm = (keysym.mod & (KMOD_META)) > 0;
 	
 	
 	/* Ignore if main term is not initialized */
@@ -2725,7 +2801,7 @@ static errr Term_bigcurs_sdl(int col, int row)
 	SDL_Rect rc;
 	
 	/* Make a rectangle */
-	RECT(col * win->tile_wid, row * win->tile_hgt, win->tile_wid * 2, win->tile_hgt, &rc);
+	RECT(col * win->tile_wid, row * win->tile_hgt, win->tile_wid * tile_width, win->tile_hgt * tile_height, &rc);
 	
 	/* Translate it */
 	rc.x += win->border;
@@ -2836,7 +2912,6 @@ static errr Term_wipe_sdl(int col, int row, int n)
 	
 	SDL_Rect rc;
 	
-	/*if (use_bigtile) n*=2;*/
 	/* Build the area to black out */
 	rc.x = col * win->tile_wid;
 	rc.y = row * win->tile_hgt;
@@ -2854,6 +2929,16 @@ static errr Term_wipe_sdl(int col, int row, int n)
 	set_update_rect(win, &rc);
 	
 	return (0);
+}
+
+/*
+ * Given a position in the ISO Latin-1 character set, return
+ * the correct character on this system.
+ */
+ static byte Term_xchar_sdl(byte c)
+{
+ 	/* The Sdl port uses the Latin-1 standard */
+ 	return (c);
 }
 
 /*
@@ -2978,9 +3063,8 @@ static errr sdl_BuildTileset(term_window *win)
 	td = GfxSurface->h / info->height;
 	
 	/* Calculate the size of the new surface */
-	x = ta * win->tile_wid;
-	if (use_bigtile) x *= 2;
-	y = td * win->tile_hgt;
+	x = ta * win->tile_wid * tile_width;
+	y = td * win->tile_hgt * tile_height;
 	
 	/* Make it */
 	win->tiles = SDL_CreateRGBSurface(SDL_SWSURFACE, x, y,
@@ -2997,13 +3081,15 @@ static errr sdl_BuildTileset(term_window *win)
 		for (yy = 0; yy < td; yy++)
 		{
 			SDL_Rect src, dest;
-			int dwid = (use_bigtile ? win->tile_wid * 2 : win->tile_wid);
+                        int dwid = win->tile_wid * tile_width;
+                        
+                        int dhgt = win->tile_hgt * tile_height;
 			
 			/* Source rectangle (on GfxSurface) */
 			RECT(xx * info->width, yy * info->height, info->width, info->height, &src);
 			
 			/* Destination rectangle (win->tiles) */
-			RECT(xx * dwid, yy * win->tile_hgt, dwid, win->tile_hgt, &dest);
+			RECT(xx * dwid, yy * dhgt, dwid, dhgt, &dest);
 			
 			/* Do the stretch thing */
 			sdl_StretchBlit(GfxSurface, &src, win->tiles, &dest);
@@ -3031,7 +3117,7 @@ static errr Term_pict_sdl(int col, int row, int n, const byte *ap, const char *c
 	term_window *win = (term_window*)(Term->data);
 	
 	SDL_Rect rc, src;
-	int i;
+	int i, j;
 	
 	/* First time a pict is requested we load the tileset in */
 	if (!win->tiles)
@@ -3048,14 +3134,17 @@ static errr Term_pict_sdl(int col, int row, int n, const byte *ap, const char *c
 	rc.y += win->title_height;
 	
 	/* Stretch for bigtile mode */
-	if (use_bigtile) rc.w *= 2;
+	rc.w *= tile_width;
+	rc.h *= tile_height;
 	
 	/* Get the dimensions of the graphic surface */
 	src.w = rc.w;
 	src.h = rc.h;
 	
 	/* Clear the way */
-	Term_wipe_sdl(col, row, use_bigtile ? n + 1 : n);
+	for (i = 0; i < tile_width; i++)
+	        for (j = 0; j < tile_height; j++)
+		        Term_wipe_sdl(col + i, row + j, n);
 	
 	/* Blit 'em! (it) */
 	for (i = 0; i < n; i++)
@@ -3114,6 +3203,7 @@ static void term_data_link_sdl(term_window *win)
 	t->wipe_hook = Term_wipe_sdl;
 	t->text_hook = Term_text_sdl;
 	t->pict_hook = Term_pict_sdl;
+	t->xchar_hook = Term_xchar_sdl;
 	
 	/* Remember where we came from */
 	t->data = win;
@@ -3304,7 +3394,8 @@ static void init_gfx(void)
 	
 	/* Make sure */
 	use_graphics = GRAPHICS_NONE;
-	use_bigtile = FALSE;
+	tile_width = 1;
+        tile_height = 1;
 #else
 	GfxInfo *info = &GfxDesc[use_graphics];
 	int i;
@@ -3332,7 +3423,8 @@ static void init_gfx(void)
 	{
 		use_graphics = GRAPHICS_NONE;
 		arg_graphics = FALSE;
-		use_bigtile = FALSE;
+		tile_width = 1;
+		tile_height = 1;
 	}
 	
 	/* Load the graphics stuff in */

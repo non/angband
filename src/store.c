@@ -25,6 +25,7 @@
 #include "init.h"
 #include "object/inventory.h"
 #include "object/tvalsval.h"
+#include "object/object.h"
 #include "spells.h"
 #include "squelch.h"
 #include "target.h"
@@ -40,8 +41,6 @@ enum
 	LOC_PRICE = 0,
 	LOC_OWNER,
 	LOC_HEADER,
-	LOC_ITEMS_START,
-	LOC_ITEMS_END,
 	LOC_MORE,
 	LOC_HELP_CLEAR,
 	LOC_HELP_PROMPT,
@@ -401,7 +400,8 @@ static bool store_will_buy(int store_num, const object_type *o_ptr)
 			for (i = 0; !accept && i < N_ELEMENTS(staples); i++)
 			{
 				if (staples[i].tval == o_ptr->tval &&
-				    staples[i].sval == o_ptr->sval)
+				    staples[i].sval == o_ptr->sval &&
+				    object_is_known(o_ptr))
 					accept = TRUE;
 			}
 
@@ -599,6 +599,9 @@ s32b price_item(const object_type *o_ptr, bool store_buying, int qty)
 
 		/* Mega-Hack -- Black market sucks */
 		if (this_store == STORE_B_MARKET) price = price / 2;
+
+		/* Check for no_selling option */
+		if (OPT(adult_no_selling)) return (0L);
 	}
 
 	/* Shop is selling */
@@ -727,66 +730,6 @@ static void mass_produce(object_type *o_ptr)
 }
 
 
-
-/*
- * Determine if a store object can "absorb" another object.
- *
- * See "object_similar()" for the same function for the "player".
- *
- * This function can ignore many of the checks done for the player,
- * since stores (but not the home) only get objects under certain
- * restricted circumstances.
- */
-static bool store_object_similar(const object_type *o_ptr, const object_type *j_ptr)
-{
-	/* Hack -- Identical items cannot be stacked */
-	if (o_ptr == j_ptr) return (0);
-
-	/* Different objects cannot be stacked */
-	if (o_ptr->k_idx != j_ptr->k_idx) return (0);
-
-	/* Different pvals cannot be stacked, except for wands, staves, or rods */
-	if ((o_ptr->pval != j_ptr->pval) &&
-	    (o_ptr->tval != TV_WAND) &&
-	    (o_ptr->tval != TV_STAFF) &&
-	    (o_ptr->tval != TV_ROD)) return (0);
-
-	/* Require many identical values */
-	if (o_ptr->to_h != j_ptr->to_h) return (0);
-	if (o_ptr->to_d != j_ptr->to_d) return (0);
-	if (o_ptr->to_a != j_ptr->to_a) return (0);
-
-	/* Require identical "artifact" names */
-	if (o_ptr->name1 != j_ptr->name1) return (0);
-
-	/* Require identical "ego-item" names */
-	if (o_ptr->name2 != j_ptr->name2) return (0);
-
-	/* Hack -- Never stack recharging items */
-	if ((o_ptr->timeout || j_ptr->timeout) && o_ptr->tval != TV_LIGHT)
-		return (0);
-
-	/* Never stack items with different fuel */
-	else if ((o_ptr->timeout != j_ptr->timeout) && o_ptr->tval == TV_LIGHT)
-		return (0);
-
-	/* Require many identical values */
-	if (o_ptr->ac != j_ptr->ac) return (0);
-	if (o_ptr->dd != j_ptr->dd) return (0);
-	if (o_ptr->ds != j_ptr->ds) return (0);
-
-	/* Hack -- Never stack chests */
-	if (o_ptr->tval == TV_CHEST) return (0);
-
-	/* Different flags */
-	if (!of_is_equal(o_ptr->flags, j_ptr->flags))
-		return FALSE;
-
-	/* They match, so they must be similar */
-	return (TRUE);
-}
-
-
 /*
  * Allow a store object to absorb another object
  */
@@ -873,7 +816,8 @@ static bool store_check_num(int st, const object_type *o_ptr)
 			j_ptr = &st_ptr->stock[i];
 
 			/* Can the new object be combined with the old one? */
-			if (object_similar(j_ptr, o_ptr)) return (TRUE);
+			if (object_similar(j_ptr, o_ptr, OSTACK_PACK))
+				return (TRUE);
 		}
 	}
 
@@ -887,7 +831,8 @@ static bool store_check_num(int st, const object_type *o_ptr)
 			j_ptr = &st_ptr->stock[i];
 
 			/* Can the new object be combined with the old one? */
-			if (store_object_similar(j_ptr, o_ptr)) return (TRUE);
+			if (object_similar(j_ptr, o_ptr, OSTACK_STORE))
+				return (TRUE);
 		}
 	}
 
@@ -922,7 +867,7 @@ static int home_carry(object_type *o_ptr)
 		j_ptr = &st_ptr->stock[slot];
 
 		/* The home acts just like the player */
-		if (object_similar(j_ptr, o_ptr))
+		if (object_similar(j_ptr, o_ptr, OSTACK_PACK))
 		{
 			/* Save the new number of items */
 			object_absorb(j_ptr, o_ptr);
@@ -1086,7 +1031,7 @@ static int store_carry(int st, object_type *o_ptr)
 		j_ptr = &st_ptr->stock[slot];
 
 		/* Can the existing items be incremented? */
-		if (store_object_similar(j_ptr, o_ptr))
+		if (object_similar(j_ptr, o_ptr, OSTACK_STORE))
 		{
 			/* Absorb (some of) the object */
 			store_object_absorb(j_ptr, o_ptr);
@@ -1835,29 +1780,30 @@ static void store_display_recalc(menu_type *m)
 	/* Then Y */
 	scr_places_y[LOC_OWNER] = 1;
 	scr_places_y[LOC_HEADER] = 3;
-	scr_places_y[LOC_ITEMS_START] = 4;
 
 	/* If we are displaying help, make the height smaller */
 	if (store_flags & (STORE_SHOW_HELP))
 		hgt -= 3;
 
-	scr_places_y[LOC_ITEMS_END] = hgt - 4;
 	scr_places_y[LOC_MORE] = hgt - 3;
-	scr_places_y[LOC_AU] = hgt - 2;
-
-
-
-	/* If we're displaying the help, then put it with a line of padding */
-	if (!(store_flags & (STORE_SHOW_HELP)))
-	{
-		hgt -= 2;
-	}
-
-	scr_places_y[LOC_HELP_CLEAR] = hgt - 1;
-	scr_places_y[LOC_HELP_PROMPT] = hgt;
+	scr_places_y[LOC_AU] = hgt - 1;
 
 	loc = m->boundary;
-	loc.page_rows = (store_flags & STORE_SHOW_HELP) ? -5 : -1;
+
+	/* If we're displaying the help, then put it with a line of padding */
+	if (store_flags & (STORE_SHOW_HELP))
+	{
+		scr_places_y[LOC_HELP_CLEAR] = hgt - 1;
+		scr_places_y[LOC_HELP_PROMPT] = hgt;
+		loc.page_rows = -5;
+	}
+	else
+	{
+		scr_places_y[LOC_HELP_CLEAR] = hgt - 2;
+		scr_places_y[LOC_HELP_PROMPT] = hgt - 1;
+		loc.page_rows = -2;
+	}
+
 	menu_layout(m, &loc);
 }
 
@@ -2531,13 +2477,17 @@ static bool store_purchase(int item)
 		/* Negative response, so give up */
 		if (!response) return FALSE;
 
-		cmd_insert(CMD_BUY, item, amt);
+		cmd_insert(CMD_BUY);
+		cmd_set_arg_item(cmd_get_top(), 0, item);
+		cmd_set_arg_number(cmd_get_top(), 1, amt);
 	}
 
 	/* Home is much easier */
 	else
 	{
-		cmd_insert(CMD_RETRIEVE, item, amt);
+		cmd_insert(CMD_RETRIEVE);
+		cmd_set_arg_item(cmd_get_top(), 0, item);
+		cmd_set_arg_number(cmd_get_top(), 1, amt);
 	}
 
 	/* Not kicked out */
@@ -2770,7 +2720,7 @@ static bool store_sell(void)
 	/* Get an item */
 	p_ptr->command_wrk = USE_INVEN;
 
-	if (!get_item(&item, prompt, reject, 'd', get_mode))
+	if (!get_item(&item, prompt, reject, CMD_DROP, get_mode))
 		return FALSE;
 
 	/* Get the item */
@@ -2829,13 +2779,17 @@ static bool store_sell(void)
 
 		screen_load();
 
-		cmd_insert(CMD_SELL, item, amt);
+		cmd_insert(CMD_SELL);
+		cmd_set_arg_item(cmd_get_top(), 0, item);
+		cmd_set_arg_number(cmd_get_top(), 1, amt);
 	}
 
 	/* Player is at home */
 	else
 	{
-		cmd_insert(CMD_STASH, item, amt);
+		cmd_insert(CMD_STASH);
+		cmd_set_arg_item(cmd_get_top(), 0, item);
+		cmd_set_arg_number(cmd_get_top(), 1, amt);
 	}
 
 	return TRUE;
@@ -2849,40 +2803,27 @@ static void store_examine(int item)
 {
 	store_type *st_ptr = &store[current_store()];
 	object_type *o_ptr;
-	bool info_known;
+
+	char header[120];
+
+	textblock *tb;
+	region area = { 0, 0, 0, 0 };
 
 	if (item < 0) return;
 
 	/* Get the actual object */
 	o_ptr = &st_ptr->stock[item];
 
-	/* Describe it fully */
-	Term_erase(0, 0, 255);
-	Term_gotoxy(0, 0);
-
-	text_out_hook = text_out_to_screen;
-	screen_save();
-
-	object_info_header(o_ptr);
-
 	/* Show full info in most stores, but normal info in player home */
-	info_known = object_info(o_ptr,
-			(current_store() != STORE_HOME) ? OINFO_FULL : OINFO_NONE);
+	tb = object_info(o_ptr, (current_store() != STORE_HOME) ? OINFO_FULL : OINFO_NONE);
+	object_desc(header, sizeof(header), o_ptr, ODESC_PREFIX | ODESC_FULL);
 
-	if (!info_known)
-		text_out("\n\nThis item does not seem to possess any special abilities.");
-
-	text_out_c(TERM_L_BLUE, "\n\n[Press any key to continue]\n");
-	(void)anykey();
-
-	screen_load();
+	textui_textblock_show(tb, area, header);
+	textblock_free(tb);
 
 	/* Hack -- Browse book, then prompt for a command */
 	if (o_ptr->tval == cp_ptr->spell_book)
-	{
-		/* Call the aux function */
-		textui_spell_browse(o_ptr, item);
-	}
+		textui_book_browse(o_ptr);
 }
 
 
@@ -2905,24 +2846,11 @@ void store_menu_set_selections(menu_type *menu)
 	}
 }
 
-void store_menu_redraw(menu_type *m)
-{
-	if (m->count > m->active.page_rows)
-		m->prompt = "  -more-";
-	else
-		m->prompt = NULL;
-}
-
 void store_menu_recalc(menu_type *m)
 {
 	store_type *st_ptr = &store[current_store()];
 
 	menu_setpriv(m, st_ptr->stock_num, st_ptr->stock);
-
-	if (m->count > m->active.page_rows)
-		m->prompt = "  -more-";
-	else
-		m->prompt = NULL;
 }
 
 /*
@@ -2955,6 +2883,7 @@ static bool store_process_command_key(char cmd)
 		{
 			Term_key_push(cmd);
 			textui_process_command(TRUE);
+			break;
 		}
 
 		/* Equipment list */
@@ -3090,6 +3019,7 @@ bool store_menu_handle(menu_type *m, const ui_event_data *event, int oid)
 
 		/* Display the store */
 		store_display_recalc(m);
+		store_menu_recalc(m);
 		store_redraw();
 
 		return processed;
@@ -3098,14 +3028,14 @@ bool store_menu_handle(menu_type *m, const ui_event_data *event, int oid)
 	return FALSE;
 }
 
-static region store_menu_region = { 1, 4, -1, -1 };
+static region store_menu_region = { 1, 4, -1, -2 };
 static const menu_iter store_menu =
 {
 	NULL,
 	NULL,
 	store_display_entry,
 	store_menu_handle,
-	store_menu_redraw
+	NULL
 };
 
 static const menu_iter store_know_menu =
@@ -3114,7 +3044,7 @@ static const menu_iter store_know_menu =
 	NULL,
 	store_display_entry,
 	NULL,
-	store_menu_redraw
+	NULL
 };
 
 
@@ -3205,14 +3135,14 @@ void do_cmd_store(cmd_code code, cmd_arg args[])
 	menu_layout(&menu, &store_menu_region);
 
 	store_menu_set_selections(&menu);
-	store_menu_recalc(&menu);
 	store_flags = STORE_INIT_CHANGE;
 	store_display_recalc(&menu);
+	store_menu_recalc(&menu);
 	store_redraw();
 
 	msg_flag = FALSE;
 	menu_select(&menu, 0);
-	msg_flag = TRUE;
+	msg_flag = FALSE;
 
 	/* Switch back to the normal game view. */
 	event_signal(EVENT_LEAVE_STORE);

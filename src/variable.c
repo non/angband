@@ -41,6 +41,7 @@ const char *copyright =
 bool arg_wizard;			/* Command arg -- Request wizard mode */
 bool arg_rebalance;			/* Command arg -- Rebalance monsters */
 int arg_graphics;			/* Command arg -- Request graphics mode */
+bool arg_graphics_nice;	        /* Command arg -- Request nice graphics mode */
 
 /*
  * Various things
@@ -68,7 +69,9 @@ s32b old_turn;			/* Hack -- Level feeling counter */
 
 
 int use_graphics;		/* The "graphics" mode is enabled */
-bool use_bigtile = FALSE;
+bool use_graphics_nice;	        /* The 'nice' "graphics" mode is enabled */
+byte tile_width = 1;            /* Tile width in units of font width */
+byte tile_height = 1;           /* Tile height in units of font height */
 
 s16b signal_count;		/* Hack -- Count interrupts */
 

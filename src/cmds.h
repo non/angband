@@ -11,6 +11,7 @@ typedef void (*cmd_handler_fn)(cmd_code code, cmd_arg args[]);
 
 /* cmd.c */
 extern void cmd_init(void);
+unsigned char cmd_lookup_key(cmd_code cmd);
 
 /* cmd0.c */
 void do_cmd_quit(cmd_code code, cmd_arg args[]);
@@ -29,7 +30,6 @@ void do_cmd_study_book(cmd_code code, cmd_arg args[]);
 
 void textui_obj_inscribe(object_type *o_ptr, int item);
 void textui_obj_examine(object_type *o_ptr, int item);
-void textui_obj_drop(object_type *o_ptr, int item);
 void textui_obj_wield(object_type *o_ptr, int item);
 
 /* cmd2.c */
@@ -55,16 +55,6 @@ void do_cmd_suicide(cmd_code code, cmd_arg args[]);
 void do_cmd_save_game(cmd_code code, cmd_arg args[]);
 
 void do_cmd_alter_aux(int dir);
-void textui_cmd_open(void);
-void textui_cmd_close(void);
-void textui_cmd_tunnel(void);
-void textui_cmd_disarm(void);
-void textui_cmd_bash(void);
-void textui_cmd_alter(void);
-void textui_cmd_spike(void);
-void textui_cmd_walk(void);
-void textui_cmd_jump(void);
-void textui_cmd_run(void);
 void textui_cmd_rest(void);
 void textui_cmd_suicide(void);
 
@@ -136,11 +126,13 @@ extern int cmp_monsters(const void *a, const void *b);
 
 
 /* ui-spell.c -- just for now */
-void textui_spell_browse(object_type *o_ptr, int item);
-void textui_obj_study(object_type *o_ptr, int item);
-void textui_obj_cast(object_type *o_ptr, int item);
+void textui_book_browse(const object_type *o_ptr);
+void textui_spell_browse(void);
+void textui_obj_study(void);
+void textui_obj_cast(void);
 
 /* ui-knowledge.c */
+extern void big_pad(int col, int row, byte a, byte c);
 extern void textui_browse_object_knowledge(void *obj, const char *name);
 extern void textui_knowledge_init(void);
 extern void textui_browse_knowledge(void);

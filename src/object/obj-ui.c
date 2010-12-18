@@ -19,7 +19,7 @@
 #include "angband.h"
 #include "button.h"
 #include "tvalsval.h"
-
+#include "cmds.h"
 
 /*
  * Display a list of objects.  Each object may be prefixed with a label.
@@ -422,7 +422,7 @@ bool verify_item(cptr prompt, int item)
  *
  * The item can be negative to mean "item on floor".
  */
-static bool get_item_allow(int item, char ch, bool is_harmless)
+static bool get_item_allow(int item, unsigned char ch, bool is_harmless)
 {
 	object_type *o_ptr;
 	char verify_inscrip[] = "!*";
@@ -578,10 +578,11 @@ static int get_tag(int *cp, char tag, char cmdkey, bool quiver_tags)
  * Note that only "acceptable" floor objects get indexes, so between two
  * commands, the indexes of floor objects may change.  XXX XXX XXX
  */
-bool get_item(int *cp, cptr pmt, cptr str, char c, int mode)
+bool get_item(int *cp, cptr pmt, cptr str, cmd_code cmd, int mode)
 {
 	int py = p_ptr->py;
 	int px = p_ptr->px;
+	unsigned char cmdkey = cmd_lookup_key(cmd);
 
 	ui_event_data which;
 
@@ -598,6 +599,7 @@ bool get_item(int *cp, cptr pmt, cptr str, char c, int mode)
 	bool use_inven = ((mode & USE_INVEN) ? TRUE : FALSE);
 	bool use_equip = ((mode & USE_EQUIP) ? TRUE : FALSE);
 	bool use_floor = ((mode & USE_FLOOR) ? TRUE : FALSE);
+	bool use_quiver = ((mode & QUIVER_TAGS) ? TRUE : FALSE);
 	bool can_squelch = ((mode & CAN_SQUELCH) ? TRUE : FALSE);
 	bool is_harmless = ((mode & IS_HARMLESS) ? TRUE : FALSE);
 	bool quiver_tags = ((mode & QUIVER_TAGS) ? TRUE : FALSE);
@@ -699,6 +701,10 @@ bool get_item(int *cp, cptr pmt, cptr str, char c, int mode)
 	{
 		/* Hack -- Start on equipment if requested */
 		if ((p_ptr->command_wrk == USE_EQUIP) && use_equip)
+			p_ptr->command_wrk = USE_EQUIP;
+
+		/* If we are using the quiver then start on equipment */
+		else if (use_quiver)
 			p_ptr->command_wrk = USE_EQUIP;
 
 		/* Use inventory if allowed */
@@ -1011,7 +1017,7 @@ bool get_item(int *cp, cptr pmt, cptr str, char c, int mode)
 						k = 0 - floor_list[0];
 
 						/* Allow player to "refuse" certain actions */
-						if (!get_item_allow(k, c, is_harmless))
+						if (!get_item_allow(k, cmdkey, is_harmless))
 						{
 							done = TRUE;
 							break;
@@ -1049,7 +1055,7 @@ bool get_item(int *cp, cptr pmt, cptr str, char c, int mode)
 					if (!get_item_okay(k)) continue;
 
 					/* Allow player to "refuse" certain actions */
-					if (!get_item_allow(k, c, is_harmless)) continue;
+					if (!get_item_allow(k, cmdkey, is_harmless)) continue;
 
 					/* Accept that choice */
 					(*cp) = k;
@@ -1068,7 +1074,7 @@ bool get_item(int *cp, cptr pmt, cptr str, char c, int mode)
 			case '7': case '8': case '9':
 			{
 				/* Look up the tag */
-				if (!get_tag(&k, which.key, c, quiver_tags))
+				if (!get_tag(&k, which.key, cmdkey, quiver_tags))
 				{
 					bell("Illegal object choice (tag)!");
 					break;
@@ -1089,7 +1095,7 @@ bool get_item(int *cp, cptr pmt, cptr str, char c, int mode)
 				}
 
 				/* Allow player to "refuse" certain actions */
-				if (!get_item_allow(k, c, is_harmless))
+				if (!get_item_allow(k, cmdkey, is_harmless))
 				{
 					done = TRUE;
 					break;
@@ -1153,7 +1159,7 @@ bool get_item(int *cp, cptr pmt, cptr str, char c, int mode)
 				}
 
 				/* Allow player to "refuse" certain actions */
-				if (!get_item_allow(k, c, is_harmless))
+				if (!get_item_allow(k, cmdkey, is_harmless))
 				{
 					done = TRUE;
 					break;
@@ -1244,7 +1250,7 @@ bool get_item(int *cp, cptr pmt, cptr str, char c, int mode)
 				}
 
 				/* Allow player to "refuse" certain actions */
-				if (!get_item_allow(k, c, is_harmless))
+				if (!get_item_allow(k, cmdkey, is_harmless))
 				{
 					done = TRUE;
 					break;

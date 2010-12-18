@@ -24,6 +24,7 @@
 #include "history.h"
 #include "object/inventory.h"
 #include "object/tvalsval.h"
+#include "object/object.h"
 #include "squelch.h"
 #include "ui-menu.h"
 
@@ -410,7 +411,7 @@ static void get_ahw(void)
 /*
  * Get the player's starting money
  */
-static void get_money(int stat_use[A_MAX])
+static void get_money(void)
 {
 /*	if (OPT(birth_money))
 	{
@@ -521,7 +522,8 @@ static void wield_all(struct player *p)
 		/* Make sure that there's an available slot */
 		if (is_ammo)
 		{
-			if (i_ptr->k_idx && !object_similar(o_ptr, i_ptr)) continue;
+			if (i_ptr->k_idx && !object_similar(o_ptr, i_ptr,
+				OSTACK_PACK)) continue;
 		}
 		else
 		{
@@ -597,7 +599,7 @@ void player_outfit(struct player *p)
 			e_ptr->kind->everseen = TRUE;
 
 			/* Deduct the cost of the item from starting cash */
-			p->au -= object_value(i_ptr, i_ptr->number,	FALSE);
+			p->au -= object_value(i_ptr, i_ptr->number, FALSE);
 		}
 	}
 
@@ -658,7 +660,8 @@ static void recalculate_stats(int *stats, int points_left)
 		if (OPT(adult_maximize))
 		{
 			/* Reset stats */
-			p_ptr->stat_cur[i] = p_ptr->stat_max[i] = p_ptr->stat_birth[i] = stats[i];
+			p_ptr->stat_cur[i] = p_ptr->stat_max[i] =
+				p_ptr->stat_birth[i] = stats[i];
 		}
 
 		/* Fixed stat maxes */
@@ -668,7 +671,8 @@ static void recalculate_stats(int *stats, int points_left)
 			int bonus = rp_ptr->r_adj[i] + cp_ptr->c_adj[i];
 
 			/* Apply the racial/class bonuses */
-			p_ptr->stat_cur[i] = p_ptr->stat_max[i] =
+			p_ptr->stat_cur[i] = p_ptr->stat_max[i] = 
+				p_ptr->stat_birth[i] =
 				modify_stat_value(stats[i], bonus);
 		}
 	}
@@ -983,7 +987,6 @@ void player_generate(struct player *p, const player_sex *s,
 /* Reset everything back to how it would be on loading the game. */
 static void do_birth_reset(bool use_quickstart, birther *quickstart_prev)
 {
-	player_init(p_ptr);
 
 	/* If there's quickstart data, we use it to set default
 	   character choices. */
@@ -1045,9 +1048,6 @@ void player_birth(bool quickstart_allowed)
 		player_generate(p_ptr, NULL, NULL, NULL);
 	}
 
-	reset_stats(stats, points_spent, &points_left);
-	do_birth_reset(quickstart_allowed, &quickstart_prev);
-
 	/* Handle incrementing name suffix */
 	buf = find_roman_suffix_start(op_ptr->full_name);
 
@@ -1076,18 +1076,19 @@ void player_birth(bool quickstart_allowed)
 
 		if (cmd->command == CMD_BIRTH_RESET)
 		{
+			player_init(p_ptr);
 			reset_stats(stats, points_spent, &points_left);
 			do_birth_reset(quickstart_allowed, &quickstart_prev);
 			rolled_stats = FALSE;
 		}
 		else if (cmd->command == CMD_CHOOSE_SEX)
 		{
-			p_ptr->psex = cmd->args[0].choice; 
+			p_ptr->psex = cmd->arg[0].choice; 
 			player_generate(p_ptr, NULL, NULL, NULL);
 		}
 		else if (cmd->command == CMD_CHOOSE_RACE)
 		{
-			p_ptr->prace = cmd->args[0].choice;
+			p_ptr->prace = cmd->arg[0].choice;
 			player_generate(p_ptr, NULL, NULL, NULL);
 
 			reset_stats(stats, points_spent, &points_left);
@@ -1096,31 +1097,47 @@ void player_birth(bool quickstart_allowed)
 		}
 		else if (cmd->command == CMD_CHOOSE_CLASS)
 		{
-			p_ptr->pclass = cmd->args[0].choice;
+			p_ptr->pclass = cmd->arg[0].choice;
 			player_generate(p_ptr, NULL, NULL, NULL);
 
 			reset_stats(stats, points_spent, &points_left);
 			generate_stats(stats, points_spent, &points_left);
 			rolled_stats = FALSE;
 		}
+		else if (cmd->command == CMD_FINALIZE_OPTIONS)
+		{
+			/* Set adult options from birth options */
+			for (i = OPT_BIRTH; i < OPT_CHEAT; i++)
+			{
+				op_ptr->opt[OPT_ADULT + (i - OPT_BIRTH)] =
+					op_ptr->opt[i];
+			}
+
+			/* Reset score options from cheat options */
+			for (i = OPT_CHEAT; i < OPT_ADULT; i++)
+			{
+				op_ptr->opt[OPT_SCORE + (i - OPT_CHEAT)] =
+					op_ptr->opt[i];
+			}
+		}
 		else if (cmd->command == CMD_BUY_STAT)
 		{
 			/* .choice is the stat to buy */
 			if (!rolled_stats)
-				buy_stat(cmd->args[0].choice, stats, points_spent, &points_left);
+				buy_stat(cmd->arg[0].choice, stats, points_spent, &points_left);
 		}
 		else if (cmd->command == CMD_SELL_STAT)
 		{
 			/* .choice is the stat to sell */
 			if (!rolled_stats)
-				sell_stat(cmd->args[0].choice, stats, points_spent, &points_left);
+				sell_stat(cmd->arg[0].choice, stats, points_spent, &points_left);
 		}
 		else if (cmd->command == CMD_RESET_STATS)
 		{
 			/* .choice is whether to regen stats */
 			reset_stats(stats, points_spent, &points_left);
 
-			if (cmd->args[0].choice)
+			if (cmd->arg[0].choice)
 				generate_stats(stats, points_spent, &points_left);
 
 			rolled_stats = FALSE;
@@ -1133,9 +1150,6 @@ void player_birth(bool quickstart_allowed)
 
 			/* Get a new character */
 			get_stats(stats);
-
-			/* Roll for gold */
-			get_money(stats);
 
 			/* Update stats with bonuses, etc. */
 			get_bonuses();
@@ -1179,10 +1193,10 @@ void player_birth(bool quickstart_allowed)
 		else if (cmd->command == CMD_NAME_CHOICE)
 		{
 			/* Set player name */
-			my_strcpy(op_ptr->full_name, cmd->args[0].string,
+			my_strcpy(op_ptr->full_name, cmd->arg[0].string,
 					  sizeof(op_ptr->full_name));
 
-			string_free((void *) cmd->args[0].string);
+			string_free((void *) cmd->arg[0].string);
 
 			/* Don't change savefile name.  If the UI
 			   wants it changed, they can do it. XXX (Good idea?) */
@@ -1206,18 +1220,6 @@ void player_birth(bool quickstart_allowed)
 
 	roll_hp();
 
-	/* Set adult options from birth options */
-	for (i = OPT_BIRTH; i < OPT_CHEAT; i++)
-	{
-		op_ptr->opt[OPT_ADULT + (i - OPT_BIRTH)] = op_ptr->opt[i];
-	}
-
-	/* Reset score options from cheat options */
-	for (i = OPT_CHEAT; i < OPT_ADULT; i++)
-	{
-		op_ptr->opt[OPT_SCORE + (i - OPT_CHEAT)] = op_ptr->opt[i];
-	}
-
 	squelch_birth_init();
 
 	/* Clear old messages, add new starting message */
@@ -1234,8 +1236,11 @@ void player_birth(bool quickstart_allowed)
 	message_add("  ", MSG_GENERIC);
 	message_add(" ", MSG_GENERIC);
 
-	/* Hack -- outfit the player */
-	player_outfit(p_ptr);
+	/* Give the player some money */
+	get_money();
+
+	/* Outfit the player, if they can sell the stuff */
+	if (!OPT(adult_no_selling)) player_outfit(p_ptr);
 
 	/* Initialise the stores */
 	store_reset();

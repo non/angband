@@ -513,7 +513,8 @@ s16b wield_slot_ammo(const object_type *o_ptr)
 		if (cursed_p(&p_ptr->inventory[i])) continue;
 
 		/* If they are stackable, we'll use this slot for sure */
-		if (object_similar(&p_ptr->inventory[i], o_ptr)) return i;
+		if (object_similar(&p_ptr->inventory[i], o_ptr,
+			OSTACK_QUIVER)) return i;
 	}
 
 	/* If not absorbed, return an open slot (or QUIVER_START if no room) */
@@ -1432,7 +1433,7 @@ static s32b object_value_real(const object_type *o_ptr, int qty, int verbose,
 	object_kind *k_ptr = &k_info[o_ptr->k_idx];
 
 	s32b power;
-	int a = 2;
+	int a = 1;
 	int b = 1;
 	static file_mode pricing_mode = MODE_WRITE;
 
@@ -1589,57 +1590,61 @@ s32b object_value(const object_type *o_ptr, int qty, int verbose)
  * Chests, and activatable items, except rods, never stack (for various
  * reasons).
  */
-bool object_similar(const object_type *o_ptr, const object_type *j_ptr)
+bool object_similar(const object_type *o_ptr, const object_type *j_ptr,
+	object_stack_t mode)
 {
 	int total = o_ptr->number + j_ptr->number;
 
+	/* Check against stacking limit - except in stores which absorb anyway */
+	if (!(mode & OSTACK_STORE) && (total >= MAX_STACK_SIZE)) return FALSE;
 
-	/* Require identical object types */
-	if (o_ptr->k_idx != j_ptr->k_idx) return (0);
+	/* Hack -- identical items cannot be stacked */
+	if (o_ptr == j_ptr) return FALSE;
 
+	/* Require identical object kinds */
+	if (o_ptr->k_idx != j_ptr->k_idx) return FALSE;
+
+	/* Different flags don't stack */
+	if (!of_is_equal(o_ptr->flags, j_ptr->flags)) return FALSE;
+
+	/* Artifacts never stack */
+	if (o_ptr->name1 || j_ptr->name1) return FALSE;
 
 	/* Analyze the items */
 	switch (o_ptr->tval)
 	{
-		/* Chests */
+		/* Chests never stack */
 		case TV_CHEST:
 		{
 			/* Never okay */
-			return (0);
+			return FALSE;
 		}
 
-		/* Gold */
-		case TV_GOLD:
-		{
-			/* Too much gold for one object_type */
-			if (o_ptr->pval + j_ptr->pval > MAX_PVAL) return 0;
-		}
-
-		/* Food and Potions and Scrolls */
+		/* Food, potions, scrolls and rods all stack nicely */
 		case TV_FOOD:
 		case TV_POTION:
 		case TV_SCROLL:
-		{
-			/* Assume okay */
-			break;
-		}
-
-		/* Staves and Wands */
-		case TV_STAFF:
-		case TV_WAND:
-		{
-			/* Too many charges for one object_type */
-			if (o_ptr->pval + j_ptr->pval > MAX_PVAL) return 0;
-		}
-
-		/* Rods */
 		case TV_ROD:
 		{
-			/* Assume okay */
+			/* Since the kinds are identical, either both will be
+			aware or both will be unaware */
 			break;
 		}
 
-		/* Weaponsm, armour and jewelery */
+		/* Gold, staves and wands stack most of the time */
+		case TV_STAFF:
+		case TV_WAND:
+		case TV_GOLD:
+		{
+			/* Too much gold or too many charges */
+			if (o_ptr->pval + j_ptr->pval > MAX_PVAL)
+				return FALSE;
+
+			/* ... otherwise ok */
+			else break;
+		}
+
+		/* Weapons, ammo, armour, jewelry, lights */
 		case TV_BOW:
 		case TV_DIGGING:
 		case TV_HAFTED:
@@ -1657,47 +1662,43 @@ bool object_similar(const object_type *o_ptr, const object_type *j_ptr)
 		case TV_RING:
 		case TV_AMULET:
 		case TV_LIGHT:
-		{
-			/* Fall through */
-		}
-
-		/* Missiles */
 		case TV_BOLT:
 		case TV_ARROW:
 		case TV_SHOT:
 		{
-			/* Require identical "bonuses" */
-			if (o_ptr->to_h != j_ptr->to_h) return (FALSE);
-			if (o_ptr->to_d != j_ptr->to_d) return (FALSE);
-			if (o_ptr->to_a != j_ptr->to_a) return (FALSE);
+			/* Require identical values */
+			if (o_ptr->ac != j_ptr->ac) return FALSE;
+			if (o_ptr->dd != j_ptr->dd) return FALSE;
+			if (o_ptr->ds != j_ptr->ds) return FALSE;
 
-			/* Require identical "pval" code */
+			/* Require identical bonuses */
+			if (o_ptr->to_h != j_ptr->to_h) return FALSE;
+			if (o_ptr->to_d != j_ptr->to_d) return FALSE;
+			if (o_ptr->to_a != j_ptr->to_a) return FALSE;
+
+			/* Require identical pval */
 			if (o_ptr->pval != j_ptr->pval) return (FALSE);
 
-			/* Require identical "artifact" names */
-			if (o_ptr->name1 != j_ptr->name1) return (FALSE);
-
-			/* Require identical "ego-item" names */
+			/* Require identical ego-item types */
 			if (o_ptr->name2 != j_ptr->name2) return (FALSE);
 
-			/* Hack - Never stack recharging items */
-			if ((o_ptr->timeout || j_ptr->timeout) && o_ptr->tval != TV_LIGHT) 
-				return FALSE;
+			/* Hack - Never stack recharging wearables ... */
+			if ((o_ptr->timeout || j_ptr->timeout) && (o_ptr->tval
+				!= TV_LIGHT)) return FALSE;
 
-			/* Lights must have same amount of fuel */
-			else if (o_ptr->timeout != j_ptr->timeout && o_ptr->tval == TV_LIGHT)
-				return FALSE;
+			/* ... and lights must have same amount of fuel */
+			else if ((o_ptr->timeout != j_ptr->timeout) &&
+				(o_ptr->tval == TV_LIGHT)) return FALSE;
 
-			/* Require identical "values" */
-			if (o_ptr->ac != j_ptr->ac) return (FALSE);
-			if (o_ptr->dd != j_ptr->dd) return (FALSE);
-			if (o_ptr->ds != j_ptr->ds) return (FALSE);
+			/* Prevent unIDd items stacking in the object list */
+			if ((mode & OSTACK_LIST) && !(o_ptr->ident &
+				j_ptr->ident & IDENT_KNOWN)) return FALSE;
 
 			/* Probably okay */
 			break;
 		}
 
-		/* Various */
+		/* Anything else */
 		default:
 		{
 			/* Probably okay */
@@ -1705,25 +1706,14 @@ bool object_similar(const object_type *o_ptr, const object_type *j_ptr)
 		}
 	}
 
-
 	/* Hack -- Require compatible inscriptions */
 	if (o_ptr->note != j_ptr->note)
 	{
 		/* Never combine different inscriptions */
-		if (o_ptr->note && j_ptr->note) return (0);
+		if (o_ptr->note && j_ptr->note) return (FALSE);
 	}
 
-
-	/* Different flags */
-	if (!of_is_equal(o_ptr->flags, j_ptr->flags))
-		return FALSE;
-
-
-	/* Maximal "stacking" limit */
-	if (total >= MAX_STACK_SIZE) return (0);
-
-
-	/* They match, so they must be similar */
+	/* They must be similar enough */
 	return (TRUE);
 }
 
@@ -1758,13 +1748,9 @@ void object_absorb(object_type *o_ptr, const object_type *j_ptr)
 	/* Hack -- Blend "notes" */
 	if (j_ptr->note != 0) o_ptr->note = j_ptr->note;
 
-	/*
-	 * Hack -- if rods are stacking, re-calculate the
-	 * pvals (maximum timeouts) and current timeouts together
-	 */
+	/* Hack -- if rods are stacking, re-calculate the timeouts */
 	if (o_ptr->tval == TV_ROD)
 	{
-		o_ptr->pval = total * j_ptr->pval;
 		o_ptr->timeout += j_ptr->timeout;
 	}
 
@@ -1919,7 +1905,7 @@ s16b floor_carry(int y, int x, object_type *j_ptr)
 		next_o_idx = o_ptr->next_o_idx;
 
 		/* Check for combination */
-		if (object_similar(o_ptr, j_ptr))
+		if (object_similar(o_ptr, j_ptr, OSTACK_FLOOR))
 		{
 			/* Combine the items */
 			object_absorb(o_ptr, j_ptr);
@@ -2085,7 +2071,8 @@ void drop_near(object_type *j_ptr, int chance, int y, int x, bool verbose)
 					o_ptr = get_next_object(o_ptr))
 			{
 				/* Check for possible combination */
-				if (object_similar(o_ptr, j_ptr)) comb = TRUE;
+				if (object_similar(o_ptr, j_ptr, OSTACK_FLOOR))
+					comb = TRUE;
 
 				/* Count objects */
 				if (!squelch_hide_item(o_ptr))
@@ -2666,7 +2653,7 @@ bool inven_stack_okay(const object_type *o_ptr)
 		if (!j_ptr->k_idx) continue;
 
 		/* Check if the two items can be combined */
-		if (object_similar(j_ptr, o_ptr)) return (TRUE);
+		if (object_similar(j_ptr, o_ptr, OSTACK_PACK)) return (TRUE);
 	}
 	return (FALSE);
 }
@@ -2711,7 +2698,7 @@ extern s16b inven_carry(struct player *p, struct object *o)
 		n = j;
 
 		/* Check if the two items can be combined */
-		if (object_similar(j_ptr, o))
+		if (object_similar(j_ptr, o, OSTACK_PACK))
 		{
 			/* Combine the items */
 			object_absorb(j_ptr, o);
@@ -3054,7 +3041,7 @@ void combine_pack(void)
 			if (!j_ptr->k_idx) continue;
 
 			/* Can we drop "o_ptr" onto "j_ptr"? */
-			if (object_similar(j_ptr, o_ptr))
+			if (object_similar(j_ptr, o_ptr, OSTACK_PACK))
 			{
 				/* Take note */
 				flag = slide = TRUE;
@@ -3536,7 +3523,7 @@ int lookup_artifact_name(const char *name)
 		artifact_type *a_ptr = &a_info[i];
 		
 		/* Found a match */
-		if (streq(name, a_ptr->name))
+		if (a_ptr->name && streq(name, a_ptr->name))
 			return i;
 		
 	} 
@@ -3666,11 +3653,14 @@ static int compare_items(const object_type *o1, const object_type *o2)
  */
 void display_object_recall(object_type *o_ptr)
 {
+	char header[120];
+
+	textblock *tb = object_info(o_ptr, OINFO_NONE);
+	object_desc(header, sizeof(header), o_ptr, ODESC_PREFIX | ODESC_FULL);
+
 	clear_from(0);
-	prt("", 0, 0);
-	object_info_header(o_ptr);
-	if (!object_info(o_ptr, OINFO_NONE))
-		text_out("This item does not seem to possess any special abilities.");
+	textui_textblock_place(tb, SCREEN_REGION, header);
+	textblock_free(tb);
 }
 
 
@@ -3691,16 +3681,12 @@ void display_object_idx_recall(s16b item)
  */
 void display_object_kind_recall(s16b k_idx)
 {
-	/* Initialize and prepare a fake object; it will be deallocated when we */
-	/* leave the function. */
-	object_type object;
-	object_type *o_ptr = &object;
-	object_wipe(o_ptr);
-	object_prep(o_ptr, &k_info[k_idx], 0, EXTREMIFY);
-	if (k_info[k_idx].aware) o_ptr->ident |= (IDENT_STORE);
+	object_type object = { 0 };
+	object_prep(&object, &k_info[k_idx], 0, EXTREMIFY);
+	if (k_info[k_idx].aware)
+		object.ident |= IDENT_STORE;
 
-	/* draw it */
-	display_object_recall(o_ptr);
+	display_object_recall(&object);
 }
 
 /*
@@ -3764,7 +3750,8 @@ void display_itemlist(void)
 				/* to its count */
 				for (j = 0; j < counter; j++)
 				{
-					if (object_similar(o_ptr, types[j]))
+					if (object_similar(o_ptr, types[j],
+						OSTACK_LIST))
 					{
 						counts[j] += o_ptr->number;
 						if ((my - p_ptr->py) * (my - p_ptr->py) + (mx - p_ptr->px) * (mx - p_ptr->px) < dy[j] * dy[j] + dx[j] * dx[j])
@@ -3897,9 +3884,11 @@ void display_itemlist(void)
 		c = object_kind_char(o_ptr->k_idx);
 
 		/* Display the pict */
-		Term_putch(cur_x++, line, a, c);
-		if (use_bigtile) Term_putch(cur_x++, line, 255, -1);
-		Term_putch(cur_x++, line, TERM_WHITE, ' ');
+		if ((tile_width == 1) && (tile_height == 1))
+		{
+		        Term_putch(cur_x++, line, a, c);
+			Term_putch(cur_x++, line, TERM_WHITE, ' ');
+		}
 
 		/* Print and bump line counter */
 		c_prt(attr, o_desc, line, cur_x);
