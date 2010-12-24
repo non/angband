@@ -121,6 +121,14 @@ static const char *comment_welcome[] =
 	"%s: \"I and my family are entirely at your service, glorious %s.\""
 };
 
+static const char *comment_hint[] =
+{
+/*	"%s tells you soberly: \"%s\".",
+	"(%s) There's a saying round here, \"%s\".",
+	"%s offers to tell you a secret next time you're about."*/
+	"\"%s\""
+};
+
 /*
  * Messages for reacting to purchase prices.
  */
@@ -307,30 +315,30 @@ testonly struct parser *store_owner_parser_new(struct store *stores) {
 static void prt_welcome(const owner_type *ot_ptr)
 {
 	char short_name[20];
-	const char *player_name;
 	const char *owner_name = ot_ptr->name;
 
-	/* We go from level 1 - 50  */
-	size_t i = ((unsigned)p_ptr->lev - 1) / 5;
+	int j;
 
-	/* Sanity check in case we increase the max level carelessly */
-	i = MIN(i, N_ELEMENTS(comment_welcome) - 1);
+	if (one_in_(2))
+		return;
 
-	/* Only show the message one in four times to stop it being irritating. */
-	if (!one_in_(4)) return;
+	/* Extract the first name of the store owner (stop before the first space) */
+	for (j = 0; owner_name[j] && owner_name[j] != ' '; j++)
+		short_name[j] = owner_name[j];
 
-	/* Welcome the character */
-	if (i)
-	{
-		int j;
+	/* Truncate the name */
+	short_name[j] = '\0';
 
-		/* Extract the first name of the store owner (stop before the first space) */
-		for (j = 0; owner_name[j] && owner_name[j] != ' '; j++)
-			short_name[j] = owner_name[j];
+	if (one_in_(3)) {
+		size_t i = randint0(N_ELEMENTS(comment_hint));
+		/*msg_format(comment_hint[i], short_name, random_hint());*/
+		msg_format(comment_hint[i], random_hint());
+	} else if (p_ptr->lev > 5) {
+		const char *player_name;
 
-		/* Truncate the name */
-		short_name[j] = '\0';
-
+		/* We go from level 1 - 50  */
+		size_t i = ((unsigned)p_ptr->lev - 1) / 5;
+		i = MIN(i, N_ELEMENTS(comment_welcome) - 1);
 
 		/* Get a title for the character */
 		if ((i % 2) && randint0(2)) player_name = cp_ptr->title[(p_ptr->lev - 1) / 5];
@@ -2827,22 +2835,41 @@ static void store_examine(int item)
 }
 
 
-void store_menu_set_selections(menu_type *menu)
+static void store_menu_set_selections(menu_type *menu, bool knowledge_menu)
 {
-	/* Roguelike */
-	if (OPT(rogue_like_commands))
+	if (knowledge_menu)
 	{
-		/* These two can't intersect! */
-		menu->cmd_keys = "\x04\x10?={}~CEIPTdegilpswx"; /* \x10 = ^p , \x04 = ^D */
-		menu->selections = "abcfmnoqrtuvyz13456790ABDFGH";
+		if (OPT(rogue_like_commands))
+		{
+			/* These two can't intersect! */
+			menu->cmd_keys = "?Ieilx";
+			menu->selections = "abcdfghjkmnopqrstuvwyz134567";
+		}
+		/* Original */
+		else
+		{
+			/* These two can't intersect! */
+			menu->cmd_keys = "?Ieil";
+			menu->selections = "abcdfghjkmnopqrstuvwxyz13456";
+		}
 	}
-
-	/* Original */
 	else
 	{
-		/* These two can't intersect! */
-		menu->cmd_keys = "\x010?={}~CEIbdegiklpstwx"; /* \x10 = ^p */
-		menu->selections = "acfhjmnoqruvyz13456790ABDFGH";
+		/* Roguelike */
+		if (OPT(rogue_like_commands))
+		{
+			/* These two can't intersect! */
+			menu->cmd_keys = "\x04\x10?={}~CEIPTdegilpswx"; /* \x10 = ^p , \x04 = ^D */
+			menu->selections = "abcfmnoqrtuvyz13456790ABDFGH";
+		}
+
+		/* Original */
+		else
+		{
+			/* These two can't intersect! */
+			menu->cmd_keys = "\x010?={}~CEIbdegiklpstwx"; /* \x10 = ^p */
+			menu->selections = "acfhjmnoqruvyz13456790ABDFGH";
+		}
 	}
 }
 
@@ -2862,8 +2889,6 @@ void store_menu_recalc(menu_type *m)
  */
 static bool store_process_command_key(char cmd)
 {
-	bool redraw = FALSE;
-
 	/* Parse the command */
 	switch (cmd)
 	{
@@ -2940,9 +2965,14 @@ static bool store_process_command_key(char cmd)
 			do_cmd_save_screen();
 			break;
 		}
+
+		default:
+		{
+			return FALSE;
+		}
 	}
 
-	return redraw;
+	return TRUE;
 }
 
 
@@ -2994,7 +3024,7 @@ bool store_menu_handle(menu_type *m, const ui_event_data *event, int oid)
 		else if (key == '=')
 		{
 			do_cmd_options();
-			store_menu_set_selections(m);
+			store_menu_set_selections(m, FALSE);
 		}
 		else
 			processed = store_process_command_key(key);
@@ -3065,9 +3095,9 @@ void do_cmd_store_knowledge(void)
 	menu_layout(&menu, &store_menu_region);
 
 	/* Calculate the positions of things and redraw */
+	store_menu_set_selections(&menu, TRUE);
 	store_flags = STORE_INIT_CHANGE;
 	store_display_recalc(&menu);
-	menu.selections = lower_case;
 	store_menu_recalc(&menu);
 	store_redraw();
 
@@ -3126,19 +3156,19 @@ void do_cmd_store(cmd_code code, cmd_arg args[])
 
 	/*** Inventory display ***/
 
-	/* Say a friendly hello. */
-	if (this_store != STORE_HOME) 
-		prt_welcome(store_owner(this_store));
-
 	/* Wipe the menu and set it up */
 	menu_init(&menu, MN_SKIN_SCROLL, &store_menu);
 	menu_layout(&menu, &store_menu_region);
 
-	store_menu_set_selections(&menu);
+	store_menu_set_selections(&menu, FALSE);
 	store_flags = STORE_INIT_CHANGE;
 	store_display_recalc(&menu);
 	store_menu_recalc(&menu);
 	store_redraw();
+
+	/* Say a friendly hello. */
+	if (this_store != STORE_HOME) 
+		prt_welcome(store_owner(this_store));
 
 	msg_flag = FALSE;
 	menu_select(&menu, 0);
