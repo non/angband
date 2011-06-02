@@ -1681,8 +1681,17 @@ static void init_graf(int g)
 		{
 			ANGBAND_GRAF = "david";
 			path_build(buf, sizeof(buf), ANGBAND_DIR_XTRA_GRAF, "32x32.png");
-			use_transparency = FALSE;
+			use_transparency = TRUE;
 			td->tile.w = td->tile.h =32;
+			break;
+		}
+
+		case GRAPHICS_SHOCKBOLT:
+		{
+			ANGBAND_GRAF = "shockbolt";
+			path_build(buf, sizeof(buf), ANGBAND_DIR_XTRA_GRAF, "64x64.png");
+			use_transparency = TRUE;
+			td->tile.w = td->tile.h =64;
 			break;
 		}
 	}
@@ -1723,7 +1732,7 @@ static void setup_graphics_menu(GladeXML *xml)
 	int i;
 	
 	// FIXME: we should be using a numerical constant here
-	for (i = 0; i < 5; i++)
+	for (i = 0; i < 6; i++)
 	{
 		bool checked = (i == arg_graphics);
 

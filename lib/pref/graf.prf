@@ -32,4 +32,8 @@
 ?:[EQU $GRAF david]
 %:graf-dvg.prf
 
+# 64x64 shockbolt tiles
+?:[EQU $GRAF shockbolt]
+%:graf-shk.prf
+
 ?:1

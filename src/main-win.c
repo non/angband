@@ -188,6 +188,8 @@
 #define IDM_OPTIONS_GRAPHICS_ADAM   402
 #define IDM_OPTIONS_GRAPHICS_DAVID  403
 #define IDM_OPTIONS_GRAPHICS_NOMAD  404
+#define IDM_OPTIONS_GRAPHICS_SHOCKBOLT 406
+
 #define IDM_OPTIONS_GRAPHICS_NICE   405
 #define IDM_OPTIONS_TRPTILE         407
 #define IDM_OPTIONS_DBLTILE         408
@@ -749,6 +751,14 @@ static void term_getsize(term_data *td)
                   td->tile_hgt = 32;
                   break;
                 }
+
+              case GRAPHICS_SHOCKBOLT:
+                {
+                  /* Reset the tile info */
+                  td->tile_wid = 64;
+                  td->tile_hgt = 64;
+                  break;
+                }
                 
               case GRAPHICS_ADAM_BOLT:
                 {
@@ -1292,18 +1302,28 @@ static bool init_graphics(void)
 			name = "32x32.png";
 			ANGBAND_GRAF = "david";
 			use_transparency = FALSE;
-		} else if (arg_graphics == GRAPHICS_ADAM_BOLT){
+
+		} else if (arg_graphics == GRAPHICS_SHOCKBOLT) {
+			wid = 64;
+			hgt = 64;
+			name = "64x64.png";
+			ANGBAND_GRAF = "shockbolt";
+			use_transparency = TRUE;
+
+		} else if (arg_graphics == GRAPHICS_ADAM_BOLT) {
 			wid = 16;
 			hgt = 16;
 			name = "16x16.png";
 			ANGBAND_GRAF = "new";
 			use_transparency = TRUE;
+
 		} else if (arg_graphics == GRAPHICS_NOMAD) {
 			wid = 16;
 			hgt = 16;
 			name = "8x16.png";
 			ANGBAND_GRAF = "nomad";
 			use_transparency = TRUE;
+
 		} else {
 			wid = 8;
 			hgt = 8;
@@ -2312,7 +2332,8 @@ static errr Term_pict_win(int x, int y, int n, const byte *ap, const char *cp, c
 
 	if ((arg_graphics == GRAPHICS_ADAM_BOLT) ||
 		(arg_graphics == GRAPHICS_NOMAD) ||
-	    (arg_graphics == GRAPHICS_DAVID_GERVAIS))
+	    (arg_graphics == GRAPHICS_DAVID_GERVAIS) ||
+		(arg_graphics == GRAPHICS_SHOCKBOLT))
 	{
 		hdcMask = CreateCompatibleDC(hdc);
 		SelectObject(hdcMask, infMask.hBitmap);
@@ -2338,6 +2359,7 @@ static errr Term_pict_win(int x, int y, int n, const byte *ap, const char *cp, c
 
 		if ((arg_graphics == GRAPHICS_ADAM_BOLT) ||
 			(arg_graphics == GRAPHICS_NOMAD) ||
+			(arg_graphics == GRAPHICS_SHOCKBOLT) ||
 		    (arg_graphics == GRAPHICS_DAVID_GERVAIS))
 		{
 			x3 = (tcp[i] & 0x7F) * w1;
@@ -2407,6 +2429,7 @@ static errr Term_pict_win(int x, int y, int n, const byte *ap, const char *cp, c
 
 	if ((arg_graphics == GRAPHICS_ADAM_BOLT) ||
 		(arg_graphics == GRAPHICS_NOMAD) ||
+		(arg_graphics == GRAPHICS_SHOCKBOLT) ||
 	    (arg_graphics == GRAPHICS_DAVID_GERVAIS))
 	{
 		/* Release */
@@ -2904,6 +2927,8 @@ static void setup_menus(void)
 	               MF_BYCOMMAND | MF_DISABLED | MF_GRAYED);
 	EnableMenuItem(hm, IDM_OPTIONS_GRAPHICS_DAVID,
 	               MF_BYCOMMAND | MF_DISABLED | MF_GRAYED);
+	EnableMenuItem(hm, IDM_OPTIONS_GRAPHICS_SHOCKBOLT,
+	               MF_BYCOMMAND | MF_DISABLED | MF_GRAYED);
         EnableMenuItem(hm, IDM_OPTIONS_GRAPHICS_NICE,
                        MF_BYCOMMAND | MF_DISABLED | MF_GRAYED);
         EnableMenuItem(hm, IDM_OPTIONS_TRPTILE,
@@ -2935,6 +2960,8 @@ static void setup_menus(void)
 	              (arg_graphics == GRAPHICS_NOMAD ? MF_CHECKED : MF_UNCHECKED));
 	CheckMenuItem(hm, IDM_OPTIONS_GRAPHICS_DAVID,
 	              (arg_graphics == GRAPHICS_DAVID_GERVAIS ? MF_CHECKED : MF_UNCHECKED));
+	CheckMenuItem(hm, IDM_OPTIONS_GRAPHICS_SHOCKBOLT,
+	              (arg_graphics == GRAPHICS_SHOCKBOLT ? MF_CHECKED : MF_UNCHECKED));
 
         CheckMenuItem(hm, IDM_OPTIONS_GRAPHICS_NICE,
                       (arg_graphics_nice ? MF_CHECKED : MF_UNCHECKED));
@@ -2962,6 +2989,7 @@ static void setup_menus(void)
 		EnableMenuItem(hm, IDM_OPTIONS_GRAPHICS_ADAM, MF_ENABLED);
 		EnableMenuItem(hm, IDM_OPTIONS_GRAPHICS_NOMAD, MF_ENABLED);
 		EnableMenuItem(hm, IDM_OPTIONS_GRAPHICS_DAVID, MF_ENABLED);
+		EnableMenuItem(hm, IDM_OPTIONS_GRAPHICS_SHOCKBOLT, MF_ENABLED);
 		EnableMenuItem(hm, IDM_OPTIONS_GRAPHICS_NICE, MF_ENABLED);
 		EnableMenuItem(hm, IDM_OPTIONS_TRPTILE, MF_ENABLED);
 		EnableMenuItem(hm, IDM_OPTIONS_DBLTILE, MF_ENABLED);
@@ -3590,6 +3618,30 @@ static void process_menus(WORD wCmd)
 			if (arg_graphics != GRAPHICS_DAVID_GERVAIS)
 			{
 				arg_graphics = GRAPHICS_DAVID_GERVAIS;
+
+				/* React to changes */
+				Term_xtra_win_react();
+
+				/* Hack -- Force redraw */
+				Term_key_push(KTRL('R'));
+			}
+
+			break;
+		}
+
+		case IDM_OPTIONS_GRAPHICS_SHOCKBOLT:
+		{
+			/* Paranoia */
+			if (!inkey_flag || !initialized)
+			{
+				plog("You may not do that right now.");
+				break;
+			}
+
+			/* Toggle "arg_graphics" */
+			if (arg_graphics != GRAPHICS_SHOCKBOLT)
+			{
+				arg_graphics = GRAPHICS_SHOCKBOLT;
 
 				/* React to changes */
 				Term_xtra_win_react();

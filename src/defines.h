@@ -881,6 +881,7 @@ enum
 #define GRAPHICS_DAVID_GERVAIS  3
 #define GRAPHICS_PSEUDO         4
 #define GRAPHICS_NOMAD          5
+#define GRAPHICS_SHOCKBOLT      6
 
 
 /* player_type.noscore flags */

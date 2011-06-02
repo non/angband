@@ -110,6 +110,7 @@ ANGBAND MENU
 			MENUITEM "&Adam Bolt's tiles", 402
 			MENUITEM "&David Gervais' tiles", 403
 			MENUITEM "&Nomad's tiles", 404
+			MENUITEM "&Shockbolt's tiles", 406
 			MENUITEM SEPARATOR
 			MENUITEM "Enable nice &graphics", 405
 			MENUITEM SEPARATOR
