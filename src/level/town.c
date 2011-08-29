@@ -39,25 +39,25 @@
  */
 void build_store(struct cave *c, int n, int yy, int xx)
 {
-	  	/* Find the "center" of the store */
-	  	int y0 = yy * 9 + 6;
-	  	int x0 = xx * 14 + 12;
+	/* Find the "center" of the store */
+	int y0 = yy * 9 + 6;
+	int x0 = xx * 14 + 12;
 
-	  	/* Determine the store boundaries */
-	  	int y1 = y0 - randint1((yy == 0) ? 3 : 2);
-	  	int y2 = y0 + randint1((yy == 1) ? 3 : 2);
-	  	int x1 = x0 - randint1(5);
-	  	int x2 = x0 + randint1(5);
+	/* Determine the store boundaries */
+	int y1 = y0 - randint1((yy == 0) ? 3 : 2);
+	int y2 = y0 + randint1((yy == 1) ? 3 : 2);
+	int x1 = x0 - randint1(5);
+	int x2 = x0 + randint1(5);
 
-	  	/* Determine door location, based on which side of the street we're on */
-	  	int dy = (yy == 0) ? y2 : y1;
-	  	int dx = rand_range(x1, x2);
+	/* Determine door location, based on which side of the street we're on */
+	int dy = (yy == 0) ? y2 : y1;
+	int dx = rand_range(x1, x2);
 
-	  	/* Build an invulnerable rectangular building */
-	  	fill_rectangle(c, y1, x1, y2, x2, FEAT_PERM_EXTRA);
+	/* Build an invulnerable rectangular building */
+	fill_rectangle(c, y1, x1, y2, x2, FEAT_PERM_EXTRA);
 
-	  	/* Clear previous contents, add a store door */
-	  	cave_set_feat(c, dy, dx, FEAT_SHOP_HEAD + n);
+	/* Clear previous contents, add a store door */
+	cave_set_feat(c, dy, dx, FEAT_SHOP_HEAD + n);
 }
 
 
@@ -76,46 +76,46 @@ void build_store(struct cave *c, int n, int yy, int xx)
  */
 void town_gen_hack(struct cave *c, struct player *p)
 {
-	  	int y, x, n, k;
-	  	int rooms[MAX_STORES];
+	int y, x, n, k;
+	int rooms[MAX_STORES];
 
-	  	int n_rows = 2;
-	  	int n_cols = (MAX_STORES + 1) / n_rows;
+	int n_rows = 2;
+	int n_cols = (MAX_STORES + 1) / n_rows;
 
-	  	/* Switch to the "simple" RNG and use our original town seed */
-	  	Rand_quick = TRUE;
-	  	Rand_value = seed_town;
+	/* Switch to the "simple" RNG and use our original town seed */
+	Rand_quick = TRUE;
+	Rand_value = seed_town;
 
-	  	/* Prepare an Array of "remaining stores", and count them */
-	  	for (n = 0; n < MAX_STORES; n++) rooms[n] = n;
+	/* Prepare an Array of "remaining stores", and count them */
+	for (n = 0; n < MAX_STORES; n++) rooms[n] = n;
 
-	  	/* Place rows of stores */
-	  	for (y = 0; y < n_rows; y++) {
-	  		  	for (x = 0; x < n_cols; x++) {
-	  		  		  	if (n < 1) break;
+	/* Place rows of stores */
+	for (y = 0; y < n_rows; y++) {
+		for (x = 0; x < n_cols; x++) {
+			if (n < 1) break;
 
-	  		  		  	/* Pick a remaining store */
-	  		  		  	k = randint0(n);
+			/* Pick a remaining store */
+			k = randint0(n);
 
-	  		  		  	/* Build that store at the proper location */
-	  		  		  	build_store(c, rooms[k], y, x);
+			/* Build that store at the proper location */
+			build_store(c, rooms[k], y, x);
 
-	  		  		  	/* Shift the stores down, remove one store */
-	  		  		  	rooms[k] = rooms[--n];
-	  		  	}
-	  	}
+			/* Shift the stores down, remove one store */
+			rooms[k] = rooms[--n];
+		}
+	}
 
-	  	/* Place the stairs */
-	  	find_empty_range(c, &y, 3, TOWN_HGT - 3, &x, 3, TOWN_WID - 3);
+	/* Place the stairs */
+	find_empty_range(c, &y, 3, TOWN_HGT - 3, &x, 3, TOWN_WID - 3);
 
-	  	/* Clear previous contents, add down stairs */
-	  	cave_set_feat(c, y, x, FEAT_MORE);
+	/* Clear previous contents, add down stairs */
+	cave_set_feat(c, y, x, FEAT_MORE);
 
-	  	/* Place the player */
-	  	player_place(c, p, y, x);
+	/* Place the player */
+	player_place(c, p, y, x);
 
-	  	/* go back to using the "complex" RNG */
-	  	Rand_quick = FALSE;
+	/* go back to using the "complex" RNG */
+	Rand_quick = FALSE;
 }
 
 
@@ -128,35 +128,35 @@ void town_gen_hack(struct cave *c, struct player *p)
  */
 bool town_gen(struct cave *c, struct player *p)
 {
-	  	int i;
-	  	bool daytime = turn % (10 * TOWN_DAWN) < (10 * TOWN_DUSK);
-	  	int residents = daytime ? MIN_M_ALLOC_TD : MIN_M_ALLOC_TN;
+	int i;
+	bool daytime = turn % (10 * TOWN_DAWN) < (10 * TOWN_DUSK);
+	int residents = daytime ? MIN_M_ALLOC_TD : MIN_M_ALLOC_TN;
 
-	  	assert(c);
+	assert(c);
 
-	  	set_cave_dimensions(c, TOWN_HGT, TOWN_WID);
+	set_cave_dimensions(c, TOWN_HGT, TOWN_WID);
 
-	  	/* NOTE: We can't use c->height and c->width here because then there'll be
-	  	 * a bunch of empty space in the level that monsters might spawn in (or
-	  	 * teleport might take you to, or whatever).
-	  	 *
-	  	 * TODO: fix this to use c->height and c->width when all the 'choose
-	  	 * random location' things honor them.
-	  	 */
+	/* NOTE: We can't use c->height and c->width here because then there'll be
+	 * a bunch of empty space in the level that monsters might spawn in (or
+	 * teleport might take you to, or whatever).
+	 *
+	 * TODO: fix this to use c->height and c->width when all the 'choose
+	 * random location' things honor them.
+	 */
 
-	  	/* Start with solid walls, and then create some floor in the middle */
-	  	fill_rectangle(c, 0, 0, DUNGEON_HGT - 1, DUNGEON_WID - 1, FEAT_PERM_SOLID);
-	  	fill_rectangle(c, 1, 1, c->height -2, c->width - 2, FEAT_FLOOR);
+	/* Start with solid walls, and then create some floor in the middle */
+	fill_rectangle(c, 0, 0, DUNGEON_HGT - 1, DUNGEON_WID - 1, FEAT_PERM_SOLID);
+	fill_rectangle(c, 1, 1, c->height -2, c->width - 2, FEAT_FLOOR);
 
-	  	/* Build stuff */
-	  	town_gen_hack(c, p);
+	/* Build stuff */
+	town_gen_hack(c, p);
 
-	  	/* Apply illumination */
-	  	cave_illuminate(c, daytime);
+	/* Apply illumination */
+	cave_illuminate(c, daytime);
 
-	  	/* Make some residents */
-	  	for (i = 0; i < residents; i++)
-	  		  	pick_and_place_distant_monster(c, loc(p->px, p->py), 3, TRUE, c->depth);
+	/* Make some residents */
+	for (i = 0; i < residents; i++)
+		pick_and_place_distant_monster(c, loc(p->px, p->py), 3, TRUE, c->depth);
 
-	  	return TRUE;
+	return TRUE;
 }

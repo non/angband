@@ -36,21 +36,19 @@
  */
 static int *cave_squares = NULL;
 
-//static void alloc_objects(struct cave *c, int set, int typ, int num, int depth, byte origin);
-//static bool alloc_object(struct cave *c, int set, int typ, int depth, byte origin);
 
 /**
  * Shuffle an array using Knuth's shuffle.
  */
 void shuffle(int *arr, int n)
 {
-	  	int i, j, k;
-	  	for (i = 0; i < n; i++) {
-	  		  	j = randint0(n - i) + i;
-	  		  	k = arr[j];
-	  		  	arr[j] = arr[i];
-	  		  	arr[i] = k;
-	  	}
+	int i, j, k;
+	for (i = 0; i < n; i++) {
+		j = randint0(n - i) + i;
+		k = arr[j];
+		arr[j] = arr[i];
+		arr[i] = k;
+	}
 }
 
 
@@ -58,28 +56,27 @@ void shuffle(int *arr, int n)
  * Locate a square in y1 <= y < y2, x1 <= x < x2 which satisfies the given
  * predicate.
  */
-static bool _find_in_range(struct cave *c, int *y, int y1, int y2, int *x,
-	  	int x1, int x2, int *squares, cave_predicate pred)
+static bool _find_in_range(struct cave *c, int *y, int y1, int y2, int *x, int x1, int x2, int *squares, cave_predicate pred)
 {
-	  	int yd = y2 - y1;
-	  	int xd = x2 - x1;
-	  	int i, n = yd * xd;
-	  	bool found = FALSE;
+	int yd = y2 - y1;
+	int xd = x2 - x1;
+	int i, n = yd * xd;
+	bool found = FALSE;
 
-	  	/* Test each square in (random) order for openness */
-	  	for (i = 0; i < n && !found; i++) {
-	  		  	int j = randint0(n - i) + i;
-	  		  	int k = squares[j];
-	  		  	squares[j] = squares[i];
-	  		  	squares[i] = k;
-
-	  		  	*y = (k / xd) + y1;
-	  		  	*x = (k % xd) + x1;
-	  		  	if (pred(c, *y, *x)) found = TRUE;
-	  	}
-
-	  	/* Return whether we found an empty square or not. */
-	  	return found;
+	/* Test each square in (random) order for openness */
+	for (i = 0; i < n && !found; i++) {
+		int j = randint0(n - i) + i;
+		int k = squares[j];
+		squares[j] = squares[i];
+		squares[i] = k;
+		
+		*y = (k / xd) + y1;
+		*x = (k % xd) + x1;
+		if (pred(c, *y, *x)) found = TRUE;
+	}
+	
+	/* Return whether we found an empty square or not. */
+	return found;
 }
 
 
@@ -88,9 +85,9 @@ static bool _find_in_range(struct cave *c, int *y, int y1, int y2, int *x,
  */
 bool cave_find(struct cave *c, int *y, int *x, cave_predicate pred)
 {
-	  	int h = c->height;
-	  	int w = c->width;
-	  	return _find_in_range(c, y, 0, h, x, 0, w, cave_squares, pred);
+	int h = c->height;
+	int w = c->width;
+	return _find_in_range(c, y, 0, h, x, 0, w, cave_squares, pred);
 }
 
 
@@ -98,26 +95,25 @@ bool cave_find(struct cave *c, int *y, int *x, cave_predicate pred)
  * Locate a square in y1 <= y < y2, x1 <= x < x2 which satisfies the given
  * predicate.
  */
-bool cave_find_in_range(struct cave *c, int *y, int y1, int y2,
-	  	int *x, int x1, int x2, cave_predicate pred)
+bool cave_find_in_range(struct cave *c, int *y, int y1, int y2, int *x, int x1, int x2, cave_predicate pred)
 {
-	  	int yd = y2 - y1;
-	  	int xd = x2 - x1;
-	  	int n = yd * xd;
-	  	int i, found;
-
-	  	/* Allocate the squares, and randomize their order */
-	  	int *squares = C_ZNEW(n, int);
-	  	for (i = 0; i < n; i++) squares[i] = i;
-
-	  	/* Do the actual search */
-	  	found = _find_in_range(c, y, y1, y2, x, x1, x2, squares, pred);
-
-	  	/* Deallocate memory */
-	  	FREE(squares);
-
-	  	/* Return whether or not we found an empty square */
-	  	return found;
+	int yd = y2 - y1;
+	int xd = x2 - x1;
+	int n = yd * xd;
+	int i, found;
+	
+	/* Allocate the squares, and randomize their order */
+	int *squares = C_ZNEW(n, int);
+	for (i = 0; i < n; i++) squares[i] = i;
+	
+	/* Do the actual search */
+	found = _find_in_range(c, y, y1, y2, x, x1, x2, squares, pred);
+	
+	/* Deallocate memory */
+	FREE(squares);
+	
+	/* Return whether or not we found an empty square */
+	return found;
 }
 
 
@@ -126,7 +122,7 @@ bool cave_find_in_range(struct cave *c, int *y, int y1, int y2,
  */
 bool find_empty(struct cave *c, int *y, int *x)
 {
-	  	return cave_find(c, y, x, cave_isempty);
+	return cave_find(c, y, x, cave_isempty);
 }
 
 
@@ -135,7 +131,7 @@ bool find_empty(struct cave *c, int *y, int *x)
  */
 bool find_empty_range(struct cave *c, int *y, int y1, int y2, int *x, int x1, int x2)
 {
-	  	return cave_find_in_range(c, y, y1, y2, x, x1, x2, cave_isempty);
+	return cave_find_in_range(c, y, y1, y2, x, x1, x2, cave_isempty);
 }
 
 
@@ -144,11 +140,11 @@ bool find_empty_range(struct cave *c, int *y, int y1, int y2, int *x, int x1, in
  */
 bool find_nearby_grid(struct cave *c, int *y, int y0, int yd, int *x, int x0, int xd)
 {
-	  	int y1 = y0 - yd;
-	  	int x1 = x0 - xd;
-	  	int y2 = y0 + yd + 1;
-	  	int x2 = x0 + xd + 1;
-	  	return cave_find_in_range(c, y, y1, y2, x, x1, x2, cave_in_bounds);
+	int y1 = y0 - yd;
+	int x1 = x0 - xd;
+	int y2 = y0 + yd + 1;
+	int x2 = x0 + xd + 1;
+	return cave_find_in_range(c, y, y1, y2, x, x1, x2, cave_in_bounds);
 }
 
 
@@ -157,18 +153,18 @@ bool find_nearby_grid(struct cave *c, int *y, int y0, int yd, int *x, int x0, in
  */
 void correct_dir(int *rdir, int *cdir, int y1, int x1, int y2, int x2)
 {
-	  	/* Extract vertical and horizontal directions */
-	  	*rdir = CMP(y2, y1);
-	  	*cdir = CMP(x2, x1);
-
-	  	/* If we only have one direction to go, then we're done */
-	  	if (!*rdir || !*cdir) return;
-
-	  	/* If we need to go diagonally, then choose a random direction */
-	  	if (randint0(100) < 50)
-	  		  	*rdir = 0;
-	  	else
-	  		  	*cdir = 0;
+	/* Extract vertical and horizontal directions */
+	*rdir = CMP(y2, y1);
+	*cdir = CMP(x2, x1);
+	
+	/* If we only have one direction to go, then we're done */
+	if (!*rdir || !*cdir) return;
+	
+	/* If we need to go diagonally, then choose a random direction */
+	if (randint0(100) < 50)
+		*rdir = 0;
+	else
+		*cdir = 0;
 }
 
 
@@ -177,10 +173,10 @@ void correct_dir(int *rdir, int *cdir, int y1, int x1, int y2, int x2)
  */
 void rand_dir(int *rdir, int *cdir)
 {
-	  	/* Pick a random direction and extract the dy/dx components */
-	  	int i = randint0(4);
-	  	*rdir = ddy_ddd[i];
-	  	*cdir = ddx_ddd[i];
+	/* Pick a random direction and extract the dy/dx components */
+	int i = randint0(4);
+	*rdir = ddy_ddd[i];
+	*cdir = ddx_ddd[i];
 }
 
 
@@ -189,9 +185,9 @@ void rand_dir(int *rdir, int *cdir)
  */
 bool cave_isstart(struct cave *c, int y, int x)
 {
-	  	if (!cave_isempty(c, y, x)) return FALSE;
-	  	if (cave_isvault(c, y, x)) return FALSE;
-	  	return TRUE;
+	if (!cave_isempty(c, y, x)) return FALSE;
+	if (cave_isvault(c, y, x)) return FALSE;
+	return TRUE;
 }
 
 
@@ -200,22 +196,22 @@ bool cave_isstart(struct cave *c, int y, int x)
  */
 void new_player_spot(struct cave *c, struct player *p)
 {
-	  	int y, x;
+	int y, x;
 
-	  	/* Try to find a good place to put the player */
-	  	cave_find_in_range(c, &y, 0, c->height, &x, 0, c->width, cave_isstart);
+	/* Try to find a good place to put the player */
+	cave_find_in_range(c, &y, 0, c->height, &x, 0, c->width, cave_isstart);
 
-	  	/* Create stairs the player came down if allowed and necessary */
-	  	if (OPT(birth_no_stairs)) {
-	  	} else if (p->create_down_stair) {
-	  		  	cave_set_feat(c, y, x, FEAT_MORE);
-	  		  	p->create_down_stair = FALSE;
-	  	} else if (p->create_up_stair) {
-	  		  	cave_set_feat(c, y, x, FEAT_LESS);
-	  		  	p->create_up_stair = FALSE;
-	  	}
+	/* Create stairs the player came down if allowed and necessary */
+	if (OPT(birth_no_stairs)) {
+	} else if (p->create_down_stair) {
+		cave_set_feat(c, y, x, FEAT_MORE);
+		p->create_down_stair = FALSE;
+	} else if (p->create_up_stair) {
+		cave_set_feat(c, y, x, FEAT_LESS);
+		p->create_up_stair = FALSE;
+	}
 
-	  	player_place(c, p, y, x);
+	player_place(c, p, y, x);
 }
 
 
@@ -224,15 +220,15 @@ void new_player_spot(struct cave *c, struct player *p)
  */
 int next_to_walls(struct cave *c, int y, int x)
 {
-	  	int k = 0;
-	  	assert(cave_in_bounds(c, y, x));
-
-	  	if (cave_iswall(c, y + 1, x)) k++;
-	  	if (cave_iswall(c, y - 1, x)) k++;
-	  	if (cave_iswall(c, y, x + 1)) k++;
-	  	if (cave_iswall(c, y, x - 1)) k++;
-
-	  	return k;
+	int k = 0;
+	assert(cave_in_bounds(c, y, x));
+	
+	if (cave_iswall(c, y + 1, x)) k++;
+	if (cave_iswall(c, y - 1, x)) k++;
+	if (cave_iswall(c, y, x + 1)) k++;
+	if (cave_iswall(c, y, x - 1)) k++;
+	
+	return k;
 }
 
 
@@ -241,7 +237,7 @@ int next_to_walls(struct cave *c, int y, int x)
  */
 void place_rubble(struct cave *c, int y, int x)
 {
-	  	cave_set_feat(c, y, x, FEAT_RUBBLE);
+	cave_set_feat(c, y, x, FEAT_RUBBLE);
 }
 
 
@@ -252,12 +248,12 @@ void place_rubble(struct cave *c, int y, int x)
  */
 void place_stairs(struct cave *c, int y, int x, int feat)
 {
-	  	if (!c->depth)
-	  		  	cave_set_feat(c, y, x, FEAT_MORE);
-	  	else if (is_quest(c->depth) || c->depth >= MAX_DEPTH - 1)
-	  		  	cave_set_feat(c, y, x, FEAT_LESS);
-	  	else
-	  		  	cave_set_feat(c, y, x, feat);
+	if (!c->depth)
+		cave_set_feat(c, y, x, FEAT_MORE);
+	else if (is_quest(c->depth) || c->depth >= MAX_DEPTH - 1)
+		cave_set_feat(c, y, x, FEAT_LESS);
+	else
+		cave_set_feat(c, y, x, feat);
 }
 
 
@@ -266,8 +262,8 @@ void place_stairs(struct cave *c, int y, int x, int feat)
  */
 void place_random_stairs(struct cave *c, int y, int x)
 {
-	  	int feat = randint0(100) < 50 ? FEAT_LESS : FEAT_MORE;
-	  	if (cave_canputitem(c, y, x)) place_stairs(c, y, x, feat);
+	int feat = randint0(100) < 50 ? FEAT_LESS : FEAT_MORE;
+	if (cave_canputitem(c, y, x)) place_stairs(c, y, x, feat);
 }
 
 
@@ -276,30 +272,30 @@ void place_random_stairs(struct cave *c, int y, int x)
  */
 void place_object(struct cave *c, int y, int x, int level, bool good, bool great, byte origin)
 {
-	  	s32b rating = 0;
-	  	object_type otype;
+	s32b rating = 0;
+	object_type otype;
+	
+	assert(cave_in_bounds(c, y, x));
+	
+	if (!cave_canputitem(c, y, x)) return;
+	
+	object_wipe(&otype);
+	if (!make_object(c, &otype, level, good, great, &rating)) return;
 
-	  	assert(cave_in_bounds(c, y, x));
+	otype.origin = origin;
+	otype.origin_depth = c->depth;
 
-	  	if (!cave_canputitem(c, y, x)) return;
-
-	  	object_wipe(&otype);
-	  	if (!make_object(c, &otype, level, good, great, &rating)) return;
-
-	  	otype.origin = origin;
-	  	otype.origin_depth = c->depth;
-
-	  	/* Give it to the floor */
-	  	/* XXX Should this be done in floor_carry? */
-	  	if (!floor_carry(c, y, x, &otype)) {
-	  		  	if (otype.artifact)
-	  		  		  	otype.artifact->created = FALSE;
-	  		  	return;
-	  	} else {
- 	  		  		  	if (otype.artifact)
-	  		  		  	c->good_item = TRUE;
-	  		  	c->obj_rating += rating;
-	  	}
+	/* Give it to the floor */
+	/* XXX Should this be done in floor_carry? */
+	if (!floor_carry(c, y, x, &otype)) {
+		if (otype.artifact)
+			otype.artifact->created = FALSE;
+		return;
+	} else {
+ 			if (otype.artifact)
+			c->good_item = TRUE;
+		c->obj_rating += rating;
+	}
 }
 
 
@@ -308,21 +304,21 @@ void place_object(struct cave *c, int y, int x, int level, bool good, bool great
  */
 void place_gold(struct cave *c, int y, int x, int level, byte origin)
 {
-	  	object_type *i_ptr;
-	  	object_type object_type_body;
+	object_type *i_ptr;
+	object_type object_type_body;
 
-	  	assert(cave_in_bounds(c, y, x));
+	assert(cave_in_bounds(c, y, x));
 
-	  	if (!cave_canputitem(c, y, x)) return;
+	if (!cave_canputitem(c, y, x)) return;
 
-	  	i_ptr = &object_type_body;
-	  	object_wipe(i_ptr);
-	  	make_gold(i_ptr, level, SV_GOLD_ANY);
+	i_ptr = &object_type_body;
+	object_wipe(i_ptr);
+	make_gold(i_ptr, level, SV_GOLD_ANY);
 
-	  	i_ptr->origin = origin;
-	  	i_ptr->origin_depth = level;
+	i_ptr->origin = origin;
+	i_ptr->origin_depth = level;
 
-	  	floor_carry(c, y, x, i_ptr);
+	floor_carry(c, y, x, i_ptr);
 }
 
 
@@ -331,7 +327,7 @@ void place_gold(struct cave *c, int y, int x, int level, byte origin)
  */
 void place_secret_door(struct cave *c, int y, int x)
 {
-	  	cave_set_feat(c, y, x, FEAT_SECRET);
+	cave_set_feat(c, y, x, FEAT_SECRET);
 }
 
 
@@ -340,14 +336,14 @@ void place_secret_door(struct cave *c, int y, int x)
  */
 void place_closed_door(struct cave *c, int y, int x)
 {
-	  	int tmp = randint0(400);
+	int tmp = randint0(400);
 
-	  	if (tmp < 300)
-	  		  	cave_set_feat(c, y, x, FEAT_DOOR_HEAD + 0x00);
-	  	else if (tmp < 399)
-	  		  	cave_set_feat(c, y, x, FEAT_DOOR_HEAD + randint1(7));
-	  	else
-	  		  	cave_set_feat(c, y, x, FEAT_DOOR_HEAD + 0x08 + randint0(8));
+	if (tmp < 300)
+		cave_set_feat(c, y, x, FEAT_DOOR_HEAD + 0x00);
+	else if (tmp < 399)
+		cave_set_feat(c, y, x, FEAT_DOOR_HEAD + randint1(7));
+	else
+		cave_set_feat(c, y, x, FEAT_DOOR_HEAD + 0x08 + randint0(8));
 }
 
 
@@ -358,16 +354,16 @@ void place_closed_door(struct cave *c, int y, int x)
  */
 void place_random_door(struct cave *c, int y, int x)
 {
-	  	int tmp = randint0(100);
+	int tmp = randint0(100);
 
-	  	if (tmp < 30)
-	  		  	cave_set_feat(c, y, x, FEAT_OPEN);
-	  	else if (tmp < 40)
-	  		  	cave_set_feat(c, y, x, FEAT_BROKEN);
-	  	else if (tmp < 60)
-	  		  	cave_set_feat(c, y, x, FEAT_SECRET);
-	  	else
-	  		  	place_closed_door(c, y, x);
+	if (tmp < 30)
+		cave_set_feat(c, y, x, FEAT_OPEN);
+	else if (tmp < 40)
+		cave_set_feat(c, y, x, FEAT_BROKEN);
+	else if (tmp < 60)
+		cave_set_feat(c, y, x, FEAT_SECRET);
+	else
+		place_closed_door(c, y, x);
 }
 
 /**
@@ -377,11 +373,11 @@ void place_random_door(struct cave *c, int y, int x)
  */
 void alloc_objects(struct cave *c, int set, int typ, int num, int depth, byte origin)
 {
-	  	int k, l = 0;
-	  	for (k = 0; k < num; k++) {
-	  		  	bool ok = alloc_object(c, set, typ, depth, origin);
-	  		  	if (!ok) l++;
-	  	}
+	int k, l = 0;
+	for (k = 0; k < num; k++) {
+		bool ok = alloc_object(c, set, typ, depth, origin);
+		if (!ok) l++;
+	}
 }
 
 
@@ -393,52 +389,52 @@ void alloc_objects(struct cave *c, int set, int typ, int num, int depth, byte or
  */
 bool alloc_object(struct cave *c, int set, int typ, int depth, byte origin)
 {
-	  	int x, y;
-	  	int tries = 0;
-	  	bool room;
+	int x, y;
+	int tries = 0;
+	bool room;
 
-	  	/* Pick a "legal" spot */
-	  	while (tries < 2000) {
-	  		  	tries++;
+	/* Pick a "legal" spot */
+	while (tries < 2000) {
+		tries++;
 
-	  		  	find_empty(c, &y, &x);
+		find_empty(c, &y, &x);
 
-	  		  	/* See if our spot is in a room or not */
-	  		  	room = (c->info[y][x] & CAVE_ROOM) ? TRUE : FALSE;
+		/* See if our spot is in a room or not */
+		room = (c->info[y][x] & CAVE_ROOM) ? TRUE : FALSE;
 
-	  		  	/* If we are ok with a corridor and we're in one, we're done */
-	  		  	if (set & SET_CORR && !room) break;
+		/* If we are ok with a corridor and we're in one, we're done */
+		if (set & SET_CORR && !room) break;
 
-	  		  	/* If we are ok with a room and we're in one, we're done */
-	  		  	if (set & SET_ROOM && room) break;
-	  	}
+		/* If we are ok with a room and we're in one, we're done */
+		if (set & SET_ROOM && room) break;
+	}
 
-	  	if (tries == 2000) return FALSE;
+	if (tries == 2000) return FALSE;
 
-	  	/* Place something */
-	  	switch (typ) {
-	  		  	case TYP_RUBBLE: place_rubble(c, y, x); break;
-	  		  	case TYP_TRAP: place_trap(c, y, x); break;
-	  		  	case TYP_GOLD: place_gold(c, y, x, depth, origin); break;
-	  		  	case TYP_OBJECT: place_object(c, y, x, depth, FALSE, FALSE, origin); break;
-	  		  	case TYP_GOOD: place_object(c, y, x, depth, TRUE, FALSE, origin); break;
-	  		  	case TYP_GREAT: place_object(c, y, x, depth, TRUE, TRUE, origin); break;
-	  	}
-	  	return TRUE;
+	/* Place something */
+	switch (typ) {
+		case TYP_RUBBLE: place_rubble(c, y, x); break;
+		case TYP_TRAP: place_trap(c, y, x); break;
+		case TYP_GOLD: place_gold(c, y, x, depth, origin); break;
+		case TYP_OBJECT: place_object(c, y, x, depth, FALSE, FALSE, origin); break;
+		case TYP_GOOD: place_object(c, y, x, depth, TRUE, FALSE, origin); break;
+		case TYP_GREAT: place_object(c, y, x, depth, TRUE, TRUE, origin); break;
+	}
+	return TRUE;
 }
 
 
 void alloc_cave_squares(int n)
 {
     int i;
-	  	cave_squares = C_ZNEW(n, int);
-	  	for (i = 0; i < n; i++) cave_squares[i] = i;
+	cave_squares = C_ZNEW(n, int);
+	for (i = 0; i < n; i++) cave_squares[i] = i;
 }
 
 void free_cave_squares(void)
 {
-	  	if (cave_squares != NULL) FREE(cave_squares);
-	  	cave_squares = NULL;
+	if (cave_squares != NULL) FREE(cave_squares);
+	cave_squares = NULL;
 }
 
 /**
@@ -446,8 +442,8 @@ void free_cave_squares(void)
  */
 void set_cave_dimensions(struct cave *c, int h, int w)
 {
-	  	c->height = h;
-	  	c->width = w;
+	c->height = h;
+	c->width = w;
     free_cave_squares();
     alloc_cave_squares(h * w);
 }
@@ -461,10 +457,10 @@ void set_cave_dimensions(struct cave *c, int h, int w)
  */
 void fill_rectangle(struct cave *c, int y1, int x1, int y2, int x2, int feat)
 {
-	  	int y, x;
-	  	for (y = y1; y <= y2; y++)
-	  		  	for (x = x1; x <= x2; x++)
-	  		  		  	cave_set_feat(c, y, x, feat);
+	int y, x;
+	for (y = y1; y <= y2; y++)
+		for (x = x1; x <= x2; x++)
+			cave_set_feat(c, y, x, feat);
 }
 
 
@@ -475,17 +471,17 @@ void fill_rectangle(struct cave *c, int y1, int x1, int y2, int x2, int feat)
  */
 void draw_rectangle(struct cave *c, int y1, int x1, int y2, int x2, int feat)
 {
-	  	int y, x;
+	int y, x;
 
-	  	for (y = y1; y <= y2; y++) {
-	  		  	cave_set_feat(c, y, x1, feat);
-	  		  	cave_set_feat(c, y, x2, feat);
-	  	}
+	for (y = y1; y <= y2; y++) {
+		cave_set_feat(c, y, x1, feat);
+		cave_set_feat(c, y, x2, feat);
+	}
 
-	  	for (x = x1; x <= x2; x++) {
-	  		  	cave_set_feat(c, y1, x, feat);
-	  		  	cave_set_feat(c, y2, x, feat);
-	  	}
+	for (x = x1; x <= x2; x++) {
+		cave_set_feat(c, y1, x, feat);
+		cave_set_feat(c, y2, x, feat);
+	}
 }
 
 
@@ -494,11 +490,11 @@ void draw_rectangle(struct cave *c, int y1, int x1, int y2, int x2, int feat)
  */
 void fill_xrange(struct cave *c, int y, int x1, int x2, int feat, int info)
 {
-	  	int x;
-	  	for (x = x1; x <= x2; x++) {
-	  		  	cave_set_feat(c, y, x, feat);
-	  		  	c->info[y][x] |= info;
-	  	}
+	int x;
+	for (x = x1; x <= x2; x++) {
+		cave_set_feat(c, y, x, feat);
+		c->info[y][x] |= info;
+	}
 }
 
 
@@ -507,11 +503,11 @@ void fill_xrange(struct cave *c, int y, int x1, int x2, int feat, int info)
  */
 void fill_yrange(struct cave *c, int x, int y1, int y2, int feat, int info)
 {
-	  	int y;
-	  	for (y = y1; y <= y2; y++) {
-	  		  	cave_set_feat(c, y, x, feat);
-	  		  	c->info[y][x] |= info;
-	  	}
+	int y;
+	for (y = y1; y <= y2; y++) {
+		cave_set_feat(c, y, x, feat);
+		c->info[y][x] |= info;
+	}
 }
 
 
@@ -520,21 +516,21 @@ void fill_yrange(struct cave *c, int x, int y1, int y2, int feat, int info)
  */
 void fill_circle(struct cave *c, int y0, int x0, int radius, int border, int feat, int info)
 {
-	  	int i, last = 0;
-	  	int r2 = radius * radius;
-	  	for(i = 0; i <= radius; i++) {
-	  		  	double j = sqrt(r2 - (i * i));
-	  		  	int k = (int)(j + 0.5);
+	int i, last = 0;
+	int r2 = radius * radius;
+	for(i = 0; i <= radius; i++) {
+		double j = sqrt(r2 - (i * i));
+		int k = (int)(j + 0.5);
 
-	  		  	int b = border;
-	  		  	if (border && last > k) b++;
-	  		  	
-	  		  	fill_xrange(c, y0 - i, x0 - k - b, x0 + k + b, feat, info);
-	  		  	fill_xrange(c, y0 + i, x0 - k - b, x0 + k + b, feat, info);
-	  		  	fill_yrange(c, x0 - i, y0 - k - b, y0 + k + b, feat, info);
-	  		  	fill_yrange(c, x0 + i, y0 - k - b, y0 + k + b, feat, info);
-	  		  	last = k;
-	  	}
+		int b = border;
+		if (border && last > k) b++;
+		
+		fill_xrange(c, y0 - i, x0 - k - b, x0 + k + b, feat, info);
+		fill_xrange(c, y0 + i, x0 - k - b, x0 + k + b, feat, info);
+		fill_yrange(c, x0 - i, y0 - k - b, y0 + k + b, feat, info);
+		fill_yrange(c, x0 + i, y0 - k - b, y0 + k + b, feat, info);
+		last = k;
+	}
 }
 
 
@@ -543,26 +539,26 @@ void fill_circle(struct cave *c, int y0, int x0, int radius, int border, int fea
  */
 void alloc_stairs(struct cave *c, int feat, int num, int walls)
 {
-	  	int y, x, i, j, done;
+	int y, x, i, j, done;
 
-	  	/* Place "num" stairs */
-	  	for (i = 0; i < num; i++) {
-	  		  	/* Place some stairs */
-	  		  	for (done = FALSE; !done; ) {
-	  		  		  	/* Try several times, then decrease "walls" */
-	  		  		  	for (j = 0; !done && j <= 1000; j++) {
-	  		  		  		  	find_empty(c, &y, &x);
+	/* Place "num" stairs */
+	for (i = 0; i < num; i++) {
+		/* Place some stairs */
+		for (done = FALSE; !done; ) {
+			/* Try several times, then decrease "walls" */
+			for (j = 0; !done && j <= 1000; j++) {
+				find_empty(c, &y, &x);
 
-	  		  		  		  	if (next_to_walls(c, y, x) < walls) continue;
+				if (next_to_walls(c, y, x) < walls) continue;
 
-	  		  		  		  	place_stairs(c, y, x, feat);
-	  		  		  		  	done = TRUE;
-	  		  		  	}
+				place_stairs(c, y, x, feat);
+				done = TRUE;
+			}
 
-	  		  		  	/* Require fewer walls */
-	  		  		  	if (walls) walls--;
-	  		  	}
-	  	}
+			/* Require fewer walls */
+			if (walls) walls--;
+		}
+	}
 }
 
 
@@ -577,60 +573,60 @@ struct pit_profile *pit_type = NULL;
  */
 static bool mon_pit_hook(int r_idx)
 {
-	  	monster_race *r_ptr = &r_info[r_idx];
+	monster_race *r_ptr = &r_info[r_idx];
 
-	  	/* pit_type needs to be set */
-	  	assert(pit_type);
+	/* pit_type needs to be set */
+	assert(pit_type);
 
-	  	/* Uniques are not allowed in pits */
-	  	if (rf_has(r_ptr->flags, RF_UNIQUE)) return FALSE;
+	/* Uniques are not allowed in pits */
+	if (rf_has(r_ptr->flags, RF_UNIQUE)) return FALSE;
 
-	  	/* Monster must have all required flags */
-	  	if (!rf_is_subset(r_ptr->flags, pit_type->flags)) return FALSE;
+	/* Monster must have all required flags */
+	if (!rf_is_subset(r_ptr->flags, pit_type->flags)) return FALSE;
 
-	  	/* Monster must not have any forbidden flags */
-	  	if (rf_is_inter(r_ptr->flags, pit_type->forbidden_flags)) return FALSE;
+	/* Monster must not have any forbidden flags */
+	if (rf_is_inter(r_ptr->flags, pit_type->forbidden_flags)) return FALSE;
 
-	  	/* Monster have all required spells */
-	  	if (!rsf_is_subset(r_ptr->spell_flags, pit_type->spell_flags)) return FALSE;
+	/* Monster have all required spells */
+	if (!rsf_is_subset(r_ptr->spell_flags, pit_type->spell_flags)) return FALSE;
 
-	  	/* Monster must not have any forbidden spells */
-	  	if (rsf_is_inter(r_ptr->spell_flags, pit_type->forbidden_spell_flags)) return FALSE;
+	/* Monster must not have any forbidden spells */
+	if (rsf_is_inter(r_ptr->spell_flags, pit_type->forbidden_spell_flags)) return FALSE;
 
-	  	/* Monster must not be explicitly forbidden */
-	  	if (pit_type->forbidden_monsters) {
-	  		  	struct pit_forbidden_monster *m;
-	  		  	for (m = pit_type->forbidden_monsters; m; m = m->next)
-	  		  		  	if (r_idx == m->r_idx) return FALSE;
-	  	}
+	/* Monster must not be explicitly forbidden */
+	if (pit_type->forbidden_monsters) {
+		struct pit_forbidden_monster *m;
+		for (m = pit_type->forbidden_monsters; m; m = m->next)
+			if (r_idx == m->r_idx) return FALSE;
+	}
 
-	  	/* If pit specifies monster types, this monster must be one of them */
-	  	if (pit_type->n_bases > 0) {
-	  		  	int i;
-	  		  	bool match_base = FALSE;
-	  		  	for (i = 0; i < pit_type->n_bases; i++) {
-	  		  		  	if (r_ptr->base == pit_type->base[i]) {
-	  		  		  		  	match_base = TRUE;
-	  		  		  		  	break;
-	  		  		  	}
-	  		  	}
-	  		  	if (!match_base) return FALSE;
-	  	}
-	  	
-	  	/* If pit specifies colors, this monster must be one of those */
-	  	if (pit_type->colors) {
-	  		  	struct pit_color_profile *colors;
-	  		  	bool match_color = FALSE;
-	  		  	for (colors = pit_type->colors; colors; colors = colors->next) {
-	  		  		  	if (r_ptr->d_attr == colors->color) {
-	  		  		  		  	match_color = TRUE;
-	  		  		  		  	break;
-	  		  		  	}
-	  		  	}
-	  		  	if (!match_color) return FALSE;
-	  	}
+	/* If pit specifies monster types, this monster must be one of them */
+	if (pit_type->n_bases > 0) {
+		int i;
+		bool match_base = FALSE;
+		for (i = 0; i < pit_type->n_bases; i++) {
+			if (r_ptr->base == pit_type->base[i]) {
+				match_base = TRUE;
+				break;
+			}
+		}
+		if (!match_base) return FALSE;
+	}
+	
+	/* If pit specifies colors, this monster must be one of those */
+	if (pit_type->colors) {
+		struct pit_color_profile *colors;
+		bool match_color = FALSE;
+		for (colors = pit_type->colors; colors; colors = colors->next) {
+			if (r_ptr->d_attr == colors->color) {
+				match_color = TRUE;
+				break;
+			}
+		}
+		if (!match_color) return FALSE;
+	}
 
-	  	return TRUE;
+	return TRUE;
 }
 
 /**
@@ -646,33 +642,33 @@ static bool mon_pit_hook(int r_idx)
  */
 int set_pit_type(int depth, int type)
 {
-	  	int i;
-	  	int pit_idx = 0;
-	  	
-	  	/* Hack -- set initial distance large */
-	  	int pit_dist = 999;
-	  	
-	  	for (i = 0; i < z_info->pit_max; i++) {
-	  		  	int offset, dist;
-	  		  	struct pit_profile *pit = &pit_info[i];
-	  		  	
-	  		  	/* Skip empty pits or pits of the wrong room type */
-	  		  	if (!pit->name || pit->room_type != type) continue;
-	  		  	
-	  		  	offset = Rand_normal(pit->ave, 10);
-	  		  	dist = ABS(offset - depth);
-	  		  	
-	  		  	if (dist < pit_dist && one_in_(pit->rarity)) {
-	  		  		  	/* This pit is the closest so far */
-	  		  		  	pit_idx = i;
-	  		  		  	pit_dist = dist;
-	  		  	}
-	  	}
+	int i;
+	int pit_idx = 0;
+	
+	/* Hack -- set initial distance large */
+	int pit_dist = 999;
+	
+	for (i = 0; i < z_info->pit_max; i++) {
+		int offset, dist;
+		struct pit_profile *pit = &pit_info[i];
+		
+		/* Skip empty pits or pits of the wrong room type */
+		if (!pit->name || pit->room_type != type) continue;
+		
+		offset = Rand_normal(pit->ave, 10);
+		dist = ABS(offset - depth);
+		
+		if (dist < pit_dist && one_in_(pit->rarity)) {
+			/* This pit is the closest so far */
+			pit_idx = i;
+			pit_dist = dist;
+		}
+	}
 
-	  	pit_type = &pit_info[pit_idx];
-	  	get_mon_num_hook = mon_pit_hook;
+	pit_type = &pit_info[pit_idx];
+	get_mon_num_hook = mon_pit_hook;
         
-	  	return pit_idx;
+	return pit_idx;
 }
 
 
@@ -681,7 +677,7 @@ int set_pit_type(int depth, int type)
  */
 int lab_toi(int y, int x, int w)
 {
-	  	return y * w + x;
+	return y * w + x;
 }
 
 /**
@@ -689,8 +685,8 @@ int lab_toi(int y, int x, int w)
  */
 void lab_toyx(int i, int w, int *y, int *x)
 {
-	  	*y = i / w;
-	  	*x = i % w;
+	*y = i / w;
+	*x = i % w;
 }
 
 /**
@@ -700,15 +696,15 @@ void lab_toyx(int i, int w, int *y, int *x)
  */
 void lab_get_adjoin(int i, int w, int *a, int *b)
 {
-	  	int y, x;
-	  	lab_toyx(i, w, &y, &x);
-	  	if (x % 2 == 0) {
-	  		  	*a = lab_toi(y - 1, x, w);
-	  		  	*b = lab_toi(y + 1, x, w);
-	  	} else {
-	  		  	*a = lab_toi(y, x - 1, w);
-	  		  	*b = lab_toi(y, x + 1, w);
-	  	}
+	int y, x;
+	lab_toyx(i, w, &y, &x);
+	if (x % 2 == 0) {
+		*a = lab_toi(y - 1, x, w);
+		*b = lab_toi(y + 1, x, w);
+	} else {
+		*a = lab_toi(y, x - 1, w);
+		*b = lab_toi(y, x + 1, w);
+	}
 }
 
 /**
@@ -724,12 +720,12 @@ void lab_get_adjoin(int i, int w, int *a, int *b)
  */
 bool lab_is_tunnel(struct cave *c, int y, int x)
 {
-	  	bool west = cave_isopen(c, y, x - 1);
-	  	bool east = cave_isopen(c, y, x + 1);
-	  	bool north = cave_isopen(c, y - 1, x);
-	  	bool south = cave_isopen(c, y + 1, x);
+	bool west = cave_isopen(c, y, x - 1);
+	bool east = cave_isopen(c, y, x + 1);
+	bool north = cave_isopen(c, y - 1, x);
+	bool south = cave_isopen(c, y + 1, x);
 
-	  	return north == south && west == east && north != west;
+	return north == south && west == east && north != west;
 }
 
 
@@ -739,8 +735,8 @@ bool lab_is_tunnel(struct cave *c, int y, int x)
  */
 void array_filler(int data[], int value, int size)
 {
-	  	int i;
-	  	for (i = 0; i < size; i++) data[i] = value;
+	int i;
+	for (i = 0; i < size; i++) data[i] = value;
 }
 
 /**
@@ -748,16 +744,16 @@ void array_filler(int data[], int value, int size)
  */
 static int ignore_point(struct cave *c, int colors[], int y, int x)
 {
-	  	int h = c->height;
-	  	int w = c->width;
-	  	int n = lab_toi(y, x, w);
+	int h = c->height;
+	int w = c->width;
+	int n = lab_toi(y, x, w);
 
-	  	if (y < 0 || x < 0 || y >= h || x >= w) return TRUE;
-	  	if (colors[n]) return TRUE;
-	  	if (cave_isvault(c, y, x)) return FALSE;
-	  	if (cave_ispassable(c, y, x)) return FALSE;
-	  	if (cave_isdoor(c, y, x)) return FALSE;
-	  	return TRUE;
+	if (y < 0 || x < 0 || y >= h || x >= w) return TRUE;
+	if (colors[n]) return TRUE;
+	if (cave_isvault(c, y, x)) return FALSE;
+	if (cave_ispassable(c, y, x)) return FALSE;
+	if (cave_isdoor(c, y, x)) return FALSE;
+	return TRUE;
 }
 
 static int xds[] = {0, 0, 1, -1, -1, -1, 1, 1};
@@ -768,45 +764,45 @@ static int yds[] = {1, -1, 0, 0, -1, 1, -1, 1};
  */
 static void build_color_point(struct cave *c, int colors[], int counts[], int y, int x, int color, bool diagonal)
 {
-	  	int h = c->height;
-	  	int w = c->width;
-	  	int size = h * w;
-	  	struct queue *queue = q_new(size);
+	int h = c->height;
+	int w = c->width;
+	int size = h * w;
+	struct queue *queue = q_new(size);
 
-	  	int dslimit = diagonal ? 8 : 4;
+	int dslimit = diagonal ? 8 : 4;
 
-	  	int *added = C_ZNEW(size, int);
-	  	array_filler(added, 0, size);
+	int *added = C_ZNEW(size, int);
+	array_filler(added, 0, size);
 
-	  	q_push_int(queue, lab_toi(y, x, w));
+	q_push_int(queue, lab_toi(y, x, w));
 
-	  	counts[color] = 0;
+	counts[color] = 0;
 
-	  	while (q_len(queue) > 0) {
-	  		  	int i, y2, x2;
-	  		  	int n2 = q_pop_int(queue);
+	while (q_len(queue) > 0) {
+		int i, y2, x2;
+		int n2 = q_pop_int(queue);
 
-	  		  	lab_toyx(n2, w, &y2, &x2);
+		lab_toyx(n2, w, &y2, &x2);
 
-	  		  	if (ignore_point(cave, colors, y2, x2)) continue;
+		if (ignore_point(cave, colors, y2, x2)) continue;
 
-	  		  	colors[n2] = color;
-	  		  	counts[color]++;
+		colors[n2] = color;
+		counts[color]++;
 
-	  		  	for (i = 0; i < dslimit; i++) {
-	  		  		  	int y3 = y2 + yds[i];
-	  		  		  	int x3 = x2 + xds[i];
-	  		  		  	int n3 = lab_toi(y3, x3, w);
-	  		  		  	if (ignore_point(cave, colors, y3, x3)) continue;
-	  		  		  	if (added[n3]) continue;
+		for (i = 0; i < dslimit; i++) {
+			int y3 = y2 + yds[i];
+			int x3 = x2 + xds[i];
+			int n3 = lab_toi(y3, x3, w);
+			if (ignore_point(cave, colors, y3, x3)) continue;
+			if (added[n3]) continue;
 
-	  		  		  	q_push_int(queue, n3);
-	  		  		  	added[n3] = 1;
-	  		  	}
-	  	}
+			q_push_int(queue, n3);
+			added[n3] = 1;
+		}
+	}
 
-	  	FREE(added);
-	  	q_free(queue);
+	FREE(added);
+	q_free(queue);
 }
 
 /**
@@ -814,18 +810,18 @@ static void build_color_point(struct cave *c, int colors[], int counts[], int y,
  */
 void build_colors(struct cave *c, int colors[], int counts[], bool diagonal)
 {
-	  	int y, x;
-	  	int h = c->height;
-	  	int w = c->width;
-	  	int color = 1;
+	int y, x;
+	int h = c->height;
+	int w = c->width;
+	int color = 1;
 
-	  	for (y = 0; y < h; y++) {
-	  		  	for (x = 0; x < w; x++) {
-	  		  		  	if (ignore_point(cave, colors, y, x)) continue;
-	  		  		  	build_color_point(cave, colors, counts, y, x, color, diagonal);
-	  		  		  	color++;
-	  		  	}
-	  	}
+	for (y = 0; y < h; y++) {
+		for (x = 0; x < w; x++) {
+			if (ignore_point(cave, colors, y, x)) continue;
+			build_color_point(cave, colors, counts, y, x, color, diagonal);
+			color++;
+		}
+	}
 }
 
 
@@ -834,10 +830,10 @@ void build_colors(struct cave *c, int colors[], int counts[], bool diagonal)
  */
 static int count_colors(int counts[], int size)
 {
-	  	int i;
-	  	int num = 0;
-	  	for (i = 0; i < size; i++) if (counts[i] > 0) num++;
-	  	return num;
+	int i;
+	int num = 0;
+	for (i = 0; i < size; i++) if (counts[i] > 0) num++;
+	return num;
 }
 
 /**
@@ -845,9 +841,9 @@ static int count_colors(int counts[], int size)
  */
 static int first_color(int counts[], int size)
 {
-	  	int i;
-	  	for (i = 0; i < size; i++) if (counts[i] > 0) return i;
-	  	return -1;
+	int i;
+	for (i = 0; i < size; i++) if (counts[i] > 0) return i;
+	return -1;
 }
 
 /**
@@ -855,10 +851,10 @@ static int first_color(int counts[], int size)
  */
 static void fix_colors(int colors[], int counts[], int from, int to, int size)
 {
-	  	int i;
-	  	for (i = 0; i < size; i++) if (colors[i] == from) colors[i] = to;
-	  	counts[to] += counts[from];
-	  	counts[from] = 0;
+	int i;
+	for (i = 0; i < size; i++) if (colors[i] == from) colors[i] = to;
+	counts[to] += counts[from];
+	counts[from] = 0;
 }
 
 /**
@@ -866,80 +862,80 @@ static void fix_colors(int colors[], int counts[], int from, int to, int size)
  */
 static void join_region(struct cave *c, int colors[], int counts[], int color)
 {
-	  	int i;
-	  	int h = c->height;
-	  	int w = c->width;
-	  	int size = h * w;
+	int i;
+	int h = c->height;
+	int w = c->width;
+	int size = h * w;
 
-	  	/* Allocate a processing queue */
-	  	struct queue *queue = q_new(size);
+	/* Allocate a processing queue */
+	struct queue *queue = q_new(size);
 
-	  	/* Allocate an array to keep track of handled squares, and which square
-	  	 * we reached them from.
-	  	 */
-	  	int *previous = C_ZNEW(size, int);
-	  	array_filler(previous, -1, size);
+	/* Allocate an array to keep track of handled squares, and which square
+	 * we reached them from.
+	 */
+	int *previous = C_ZNEW(size, int);
+	array_filler(previous, -1, size);
 
-	  	/* Push all squares of the given color onto the queue */
-	  	for (i = 0; i < size; i++) {
-	  		  	if (colors[i] == color) {
-	  		  		  	q_push_int(queue, i);
-	  		  		  	previous[i] = i;
-	  		  	}
-	  	}
+	/* Push all squares of the given color onto the queue */
+	for (i = 0; i < size; i++) {
+		if (colors[i] == color) {
+			q_push_int(queue, i);
+			previous[i] = i;
+		}
+	}
 
-	  	/* Process all squares into the queue */
-	  	while (q_len(queue) > 0) {
-	  		  	/* Get the current square and its color */
-	  		  	int n = q_pop_int(queue);
-	  		  	int color2 = colors[n];
+	/* Process all squares into the queue */
+	while (q_len(queue) > 0) {
+		/* Get the current square and its color */
+		int n = q_pop_int(queue);
+		int color2 = colors[n];
 
-	  		  	/* See if we've reached a square with a new color */
-	  		  	if (color2 && color2 != color) {
-	  		  		  	/* Step backward through the path, turning stone to tunnel */
-	  		  		  	while (colors[n] != color) {
-	  		  		  		  	int x, y;
-	  		  		  		  	lab_toyx(n, w, &y, &x);
-	  		  		  		  	colors[n] = color;
-	  		  		  		  	if (!cave_isperm(c, y, x) && !cave_isvault(c, y, x)) {
-	  		  		  		  		  	cave_set_feat(c, y, x, FEAT_FLOOR);
-	  		  		  		  	}
-	  		  		  		  	n = previous[n];
-	  		  		  	}
+		/* See if we've reached a square with a new color */
+		if (color2 && color2 != color) {
+			/* Step backward through the path, turning stone to tunnel */
+			while (colors[n] != color) {
+				int x, y;
+				lab_toyx(n, w, &y, &x);
+				colors[n] = color;
+				if (!cave_isperm(c, y, x) && !cave_isvault(c, y, x)) {
+					cave_set_feat(c, y, x, FEAT_FLOOR);
+				}
+				n = previous[n];
+			}
 
-	  		  		  	/* Update the color mapping to combine the two colors */
-	  		  		  	fix_colors(colors, counts, color2, color, size);
+			/* Update the color mapping to combine the two colors */
+			fix_colors(colors, counts, color2, color, size);
 
-	  		  		  	/* We're done now */
-	  		  		  	break;
-	  		  	}
+			/* We're done now */
+			break;
+		}
 
-	  		  	/* If we haven't reached a new color, add all the unprocessed adjacent
-	  		  	 * squares to our queue.
-	  		  	 */
-	  		  	for (i = 0; i < 4; i++) {
-	  		  		  	int y, x, n2;
-	  		  		  	lab_toyx(n, w, &y, &x);
+		/* If we haven't reached a new color, add all the unprocessed adjacent
+		 * squares to our queue.
+		 */
+		for (i = 0; i < 4; i++) {
+			int y, x, n2;
+			lab_toyx(n, w, &y, &x);
 
-	  		  		  	/* Move to the adjacent square */
-	  		  		  	y += yds[i];
-	  		  		  	x += xds[i];
+			/* Move to the adjacent square */
+			y += yds[i];
+			x += xds[i];
 
-	  		  		  	/* make sure we stay inside the boundaries */
-	  		  		  	if (y < 0 || y >= h) continue;
-	  		  		  	if (x < 0 || x >= w) continue;
+			/* make sure we stay inside the boundaries */
+			if (y < 0 || y >= h) continue;
+			if (x < 0 || x >= w) continue;
 
-	  		  		  	/* If the cell hasn't already been procssed, add it to the queue */
-	  		  		  	n2 = lab_toi(y, x, w);
-	  		  		  	if (previous[n2] >= 0) continue;
-	  		  		  	q_push_int(queue, n2);
-	  		  		  	previous[n2] = n;
-	  		  	}
-	  	}
+			/* If the cell hasn't already been procssed, add it to the queue */
+			n2 = lab_toi(y, x, w);
+			if (previous[n2] >= 0) continue;
+			q_push_int(queue, n2);
+			previous[n2] = n;
+		}
+	}
 
-	  	/* Free the memory we've allocated */
-	  	q_free(queue);
-	  	FREE(previous);
+	/* Free the memory we've allocated */
+	q_free(queue);
+	FREE(previous);
 }
 
 
@@ -948,19 +944,19 @@ static void join_region(struct cave *c, int colors[], int counts[], int color)
  */
 void join_regions(struct cave *c, int colors[], int counts[])
 {
-	  	int h = c->height;
-	  	int w = c->width;
-	  	int size = h * w;
-	  	int num = count_colors(counts, size);
+	int h = c->height;
+	int w = c->width;
+	int size = h * w;
+	int num = count_colors(counts, size);
 
-	  	/* While we have multiple colors (i.e. disconnected regions), join one of
-	  	 * the regions to another one.
-	  	 */
-	  	while (num > 1) {
-	  		  	int color = first_color(counts, size);
-	  		  	join_region(c, colors, counts, color);
-	  		  	num--;
-	  	}
+	/* While we have multiple colors (i.e. disconnected regions), join one of
+	 * the regions to another one.
+	 */
+	while (num > 1) {
+		int color = first_color(counts, size);
+		join_region(c, colors, counts, color);
+		num--;
+	}
 }
 
 
@@ -972,13 +968,13 @@ void join_regions(struct cave *c, int colors[], int counts[])
  */
 void ensure_connectedness(struct cave *c)
 {
-	  	int size = c->height * c->width;
-	  	int *colors = C_ZNEW(size, int);
-	  	int *counts = C_ZNEW(size, int);
+	int size = c->height * c->width;
+	int *colors = C_ZNEW(size, int);
+	int *counts = C_ZNEW(size, int);
 
-	  	build_colors(c, colors, counts, TRUE);
-	  	join_regions(c, colors, counts);
+	build_colors(c, colors, counts, TRUE);
+	join_regions(c, colors, counts);
 
-	  	FREE(colors);
-	  	FREE(counts);
+	FREE(colors);
+	FREE(counts);
 }
