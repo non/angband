@@ -81,6 +81,7 @@ ANGFILES = \
 	history.o \
 	init2.o \
 	keymap.o \
+	level/gen-util.o \
 	level/generate.o \
 	load.o \
 	monster/mon-init.o \
