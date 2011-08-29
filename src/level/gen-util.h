@@ -48,5 +48,12 @@ void alloc_cave_squares(int n);
 void free_cave_squares(void);
 void set_cave_dimensions(struct cave *c, int h, int w);
 
-#endif /* !GENERATE_H */
+void fill_rectangle(struct cave *c, int y1, int x1, int y2, int x2, int feat);
+void draw_rectangle(struct cave *c, int y1, int x1, int y2, int x2, int feat);
+void fill_xrange(struct cave *c, int y, int x1, int x2, int feat, int info);
+void fill_yrange(struct cave *c, int x, int y1, int y2, int feat, int info);
+void fill_circle(struct cave *c, int y0, int x0, int radius, int border, int feat, int info);
+
+
+#endif /* GENERATE_H */
 

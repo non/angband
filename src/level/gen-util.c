@@ -463,3 +463,87 @@ void set_cave_dimensions(struct cave *c, int h, int w)
     alloc_cave_squares(h * w);
 }
 
+
+
+/**
+ * Fill a rectangle with a feature.
+ *
+ * The boundaries (y1, x1, y2, x2) are inclusive.
+ */
+void fill_rectangle(struct cave *c, int y1, int x1, int y2, int x2, int feat)
+{
+	  	int y, x;
+	  	for (y = y1; y <= y2; y++)
+	  		  	for (x = x1; x <= x2; x++)
+	  		  		  	cave_set_feat(c, y, x, feat);
+}
+
+
+/**
+ * Fill the edges of a rectangle with a feature.
+ *
+ * The boundaries (y1, x1, y2, x2) are inclusive.
+ */
+void draw_rectangle(struct cave *c, int y1, int x1, int y2, int x2, int feat)
+{
+	  	int y, x;
+
+	  	for (y = y1; y <= y2; y++) {
+	  		  	cave_set_feat(c, y, x1, feat);
+	  		  	cave_set_feat(c, y, x2, feat);
+	  	}
+
+	  	for (x = x1; x <= x2; x++) {
+	  		  	cave_set_feat(c, y1, x, feat);
+	  		  	cave_set_feat(c, y2, x, feat);
+	  	}
+}
+
+
+/**
+ * Fill a horizontal range with the given feature/info.
+ */
+void fill_xrange(struct cave *c, int y, int x1, int x2, int feat, int info)
+{
+	  	int x;
+	  	for (x = x1; x <= x2; x++) {
+	  		  	cave_set_feat(c, y, x, feat);
+	  		  	c->info[y][x] |= info;
+	  	}
+}
+
+
+/**
+ * Fill a vertical range with the given feature/info.
+ */
+void fill_yrange(struct cave *c, int x, int y1, int y2, int feat, int info)
+{
+	  	int y;
+	  	for (y = y1; y <= y2; y++) {
+	  		  	cave_set_feat(c, y, x, feat);
+	  		  	c->info[y][x] |= info;
+	  	}
+}
+
+
+/**
+ * Fill a circle with the given feature/info.
+ */
+void fill_circle(struct cave *c, int y0, int x0, int radius, int border, int feat, int info)
+{
+	  	int i, last = 0;
+	  	int r2 = radius * radius;
+	  	for(i = 0; i <= radius; i++) {
+	  		  	double j = sqrt(r2 - (i * i));
+	  		  	int k = (int)(j + 0.5);
+
+	  		  	int b = border;
+	  		  	if (border && last > k) b++;
+	  		  	
+	  		  	fill_xrange(c, y0 - i, x0 - k - b, x0 + k + b, feat, info);
+	  		  	fill_xrange(c, y0 + i, x0 - k - b, x0 + k + b, feat, info);
+	  		  	fill_yrange(c, x0 - i, y0 - k - b, y0 + k + b, feat, info);
+	  		  	fill_yrange(c, x0 + i, y0 - k - b, y0 + k + b, feat, info);
+	  		  	last = k;
+	  	}
+}

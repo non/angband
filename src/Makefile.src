@@ -83,6 +83,7 @@ ANGFILES = \
 	keymap.o \
 	level/gen-util.o \
 	level/generate.o \
+	level/town.o \
 	load.o \
 	monster/mon-init.o \
 	monster/melee1.o \
