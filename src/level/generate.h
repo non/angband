@@ -3,6 +3,8 @@
 #ifndef GENERATE_H
 #define GENERATE_H
 
+#include "level/gen-util.h"
+
 //void ensure_connectedness(struct cave *c);
 
 void place_object(struct cave *c, int y, int x, int level, bool good,
@@ -106,5 +108,40 @@ typedef struct pit_profile {
 	struct pit_forbidden_monster *forbidden_monsters;
 } pit_profile;
 
+/**
+ * Structure to hold all "dungeon generation" data
+ */
+struct dun_data {
+	/* The profile used to generate the level */
+	const struct cave_profile *profile;
+
+	/* Array of centers of rooms */
+	int cent_n;
+	struct loc cent[CENT_MAX];
+
+	/* Array of possible door locations */
+	int door_n;
+	struct loc door[DOOR_MAX];
+
+	/* Array of wall piercing locations */
+	int wall_n;
+	struct loc wall[WALL_MAX];
+
+	/* Array of tunnel grids */
+	int tunn_n;
+	struct loc tunn[TUNN_MAX];
+
+	/* Number of blocks along each axis */
+	int row_rooms;
+	int col_rooms;
+
+	/* Array of which blocks are used */
+	bool room_map[MAX_ROOMS_ROW][MAX_ROOMS_COL];
+
+	/* Hack -- there is a pit/nest on this level */
+	bool crowded;
+};
+
+struct dun_data *get_dun(void);
 
 #endif /* !GENERATE_H */

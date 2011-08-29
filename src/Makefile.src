@@ -83,7 +83,9 @@ ANGFILES = \
 	keymap.o \
 	level/gen-util.o \
 	level/generate.o \
+	level/cavern.o \
 	level/labyrinth.o \
+	level/room.o \
 	level/town.o \
 	load.o \
 	monster/mon-init.o \
