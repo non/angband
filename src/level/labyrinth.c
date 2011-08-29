@@ -44,8 +44,8 @@ bool labyrinth_gen(struct cave *c, struct player *p)
 
 	/* Size of the actual labyrinth part must be odd. */
 	/* NOTE: these are not the actual dungeon size, but rather the size of the
-  	  * area we're genearting a labyrinth in (which doesn't count theh enclosing
-  	  * outer walls. */
+	 * area we're genearting a labyrinth in (which doesn't count theh enclosing
+	 * outer walls. */
 	int h = 15 + randint0(c->depth / 10) * 2;
 	int w = 51 + randint0(c->depth / 10) * 2;
 
@@ -53,18 +53,18 @@ bool labyrinth_gen(struct cave *c, struct player *p)
 	int n = h * w;
 
 	/* NOTE: 'sets' and 'walls' are too large... we only need to use about
-  	  * 1/4 as much memory. However, in that case, the addressing math becomes
-  	  * a lot more complicated, so let's just stick with this because it's
-  	  * easier to read. */
+	 * 1/4 as much memory. However, in that case, the addressing math becomes
+	 * a lot more complicated, so let's just stick with this because it's
+	 * easier to read. */
 
-  	 /* 'sets' tracks connectedness; if sets[i] == sets[j] then cells i and j
-  	  * are connected to each other in the maze. */
+	/* 'sets' tracks connectedness; if sets[i] == sets[j] then cells i and j
+	 * are connected to each other in the maze. */
 	int *sets;
 
-  	 /* 'walls' is a list of wall coordinates which we will randomize */
-  	 int *walls;
+	/* 'walls' is a list of wall coordinates which we will randomize */
+	int *walls;
 
-  	 /* Most labyrinths are lit */
+	/* Most labyrinths are lit */
 	bool lit = randint0(c->depth) < 25 || randint0(2) < 1;
 
 	/* Many labyrinths are known */
@@ -91,7 +91,7 @@ bool labyrinth_gen(struct cave *c, struct player *p)
 
 	/* Only generate the level if we pass a check */
 	/* NOTE: This test gets performed after we pass the test to use the
-  	  * labyrinth cave profile. */
+	 * labyrinth cave profile. */
 	if (randint0(100) >= chance) return FALSE;
 
 	/* allocate our arrays */
