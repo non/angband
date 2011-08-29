@@ -1,4 +1,4 @@
-/* generate.h - dungeon generation interface */
+/* level/generate.h - dungeon generation interface */
 
 #ifndef GENERATE_H
 #define GENERATE_H

@@ -21,7 +21,7 @@
 #include "cave.h"
 #include "math.h"
 #include "files.h"
-#include "generate.h"
+#include "level/generate.h"
 #include "monster/mon-make.h"
 #include "monster/mon-spell.h"
 #include "object/tvalsval.h"

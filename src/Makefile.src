@@ -76,12 +76,12 @@ ANGFILES = \
 	files.o \
 	game-cmd.o \
 	game-event.o \
-	generate.o \
 	grafmode.o \
 	guid.o \
 	history.o \
 	init2.o \
 	keymap.o \
+	level/generate.o \
 	load.o \
 	monster/mon-init.o \
 	monster/melee1.o \

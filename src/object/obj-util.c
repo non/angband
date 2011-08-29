@@ -20,7 +20,7 @@
 #include "cave.h"
 #include "effects.h"
 #include "game-cmd.h"
-#include "generate.h"
+#include "level/generate.h"
 #include "history.h"
 #include "monster/mon-make.h"
 #include "object/inventory.h"

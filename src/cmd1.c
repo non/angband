@@ -22,7 +22,7 @@
 #include "cave.h"
 #include "cmds.h"
 #include "game-event.h"
-#include "generate.h"
+#include "level/generate.h"
 #include "history.h"
 #include "monster/mon-timed.h"
 #include "monster/mon-util.h"

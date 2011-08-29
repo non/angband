@@ -23,7 +23,7 @@
 #include "cmds.h"
 #include "game-event.h"
 #include "game-cmd.h"
-#include "generate.h"
+#include "level/generate.h"
 #include "history.h"
 #include "keymap.h"
 #include "init.h"
