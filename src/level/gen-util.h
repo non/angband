@@ -54,6 +54,9 @@ void fill_xrange(struct cave *c, int y, int x1, int x2, int feat, int info);
 void fill_yrange(struct cave *c, int x, int y1, int y2, int feat, int info);
 void fill_circle(struct cave *c, int y0, int x0, int radius, int border, int feat, int info);
 
+void alloc_stairs(struct cave *c, int feat, int num, int walls);
+
+int set_pit_type(int depth, int type);
 
 #endif /* GENERATE_H */
 

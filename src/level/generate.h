@@ -73,6 +73,7 @@ struct room_profile {
 	int rarity; /* How unusual this room is */
 	int cutoff; /* Upper limit of 1-100 random roll for room generation */
 };
+	
 
 struct pit_color_profile {
 	struct pit_color_profile *next;
