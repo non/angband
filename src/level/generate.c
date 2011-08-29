@@ -36,7 +36,6 @@
 
 static bool default_gen(struct cave *c, struct player *p);
 
-
 /**
  * Note that Level generation is *not* an important bottleneck, though it can
  * be annoyingly slow on older machines...  Thus we emphasize "simplicity" and
@@ -96,31 +95,10 @@ static bool default_gen(struct cave *c, struct player *p);
  * This is the global structure representing dungeon generation info.
  */
 static struct dun_data *dun;
-
 struct dun_data *get_dun(void)
 {
 	return dun;
 }
-
-/**
- * Profile used for generating the town level.
- */
-static struct cave_profile town_profile = {
-	/* name builder dun_rooms dun_unusual max_rarity n_room_profiles */
-	"town-default", town_gen, 50, 200, 2, 0,
-
-	/* name rnd chg con pen jct */
-	{"tunnel-default", 10, 30, 15, 25, 90},
-
-	/* name den rng mag mc qua qc */
-	{"streamer-default", 5, 2, 3, 90, 2, 40},
-
-	/* room_profiles -- not applicable */
-	NULL,
-
-	/* cutoff -- not applicable */
-	0
-};
 
 
 /* name function width height min-depth crowded? rarity %cutoff */
@@ -145,59 +123,36 @@ static struct room_profile default_rooms[] = {
 };
 
 
-#define NUM_CAVE_PROFILES 3
+static struct cave_profile default_profile = {
+	/* name builder dun_rooms dun_unusual max_rarity n_room_profiles */
+	"default", default_gen, 50, 200, 2, N_ELEMENTS(default_rooms),
+
+	/* name rnd chg con pen jct */
+	{"tunnel-default", 10, 30, 15, 25, 90},
+
+	/* name den rng mag mc qua qc */
+	{"streamer-default", 5, 2, 3, 90, 2, 40},
+
+	/* room_profiles */
+	default_rooms,
+
+	/* cutoff */
+	100
+};
+
 
 /**
- * Profiles used for generating dungeon levels.
+ * Reset the current dungeon's generation data.
  */
-static struct cave_profile cave_profiles[NUM_CAVE_PROFILES] = {
-	{
-		"labyrinth", labyrinth_gen, 0, 200, 0, 0,
-
-		/* tunnels -- not applicable */
-		{"tunnel-default", 10, 30, 15, 25, 90},
-
-		/* streamers -- not applicable */
-		{"streamer-default", 5, 2, 3, 90, 2, 40},
-
-		/* room_profiles -- not applicable */
-		NULL,
-
-		/* cutoff -- unused because of internal checks in labyrinth_gen  */
-		100
-	},
-	{
-		"cavern", cavern_gen, 0, 200, 0, 0,
-
-		/* tunnels -- not applicable */
-		{"tunnel-default", 10, 30, 15, 25, 90},
-
-		/* streamers -- not applicable */
-		{"streamer-default", 5, 2, 3, 90, 2, 40},
-
-		/* room_profiles -- not applicable */
-		NULL,
-
-		/* cutoff -- debug  */
-		10
-	},
-	{
-		/* name builder dun_rooms dun_unusual max_rarity n_room_profiles */
-		"default", default_gen, 50, 200, 2, N_ELEMENTS(default_rooms),
-
-		/* name rnd chg con pen jct */
-		{"tunnel-default", 10, 30, 15, 25, 90},
-
-		/* name den rng mag mc qua qc */
-		{"streamer-default", 5, 2, 3, 90, 2, 40},
-
-		/* room_profiles */
-		default_rooms,
-
-		/* cutoff */
-		100
+static void clear_dun_data(struct dun_data *d)
+{
+	int bx, by;
+	for (by = 0; by < MAX_ROOMS_ROW; by++) {
+		for (bx = 0; bx < MAX_ROOMS_COL; bx++) {
+			d->room_map[by][bx] = FALSE;
+		}
 	}
-};
+}
 
 
 /**
@@ -247,7 +202,6 @@ static void build_streamer(struct cave *c, int feat, int chance)
 		if (!cave_in_bounds(c, y, x)) break;
 	}
 }
-
 
 
 /**
@@ -446,6 +400,7 @@ static void build_tunnel(struct cave *c, int row1, int col1, int row2, int col2)
 	}
 }
 
+
 /**
  * Count the number of corridor grids adjacent to the given grid.
  *
@@ -472,6 +427,7 @@ static int next_to_corr(struct cave *c, int y1, int x1)
 	/* Return the number of corridors */
 	return k;
 }
+
 
 /**
  * Returns whether a doorway can be built in a space.
@@ -787,8 +743,6 @@ static bool default_gen(struct cave *c, struct player *p)
 }
 
 
-
-
 /**
  * Clear the dungeon, ready for generation to begin.
  */
@@ -831,6 +785,7 @@ static void cave_clear(struct cave *c, struct player *p)
 	c->mon_rating = 0;
 	c->obj_rating = 0;
 }
+
 
 /**
  * Place hidden squares that will be used to generate feeling
@@ -921,36 +876,32 @@ static int calc_mon_feeling(struct cave *c)
 }
 
 
-/**
- * Reset the current dungeon's generation data.
- */
-static void clear_dun_data(struct dun_data *d) {
-	int bx, by;
-	for (by = 0; by < MAX_ROOMS_ROW; by++) {
-		for (bx = 0; bx < MAX_ROOMS_COL; bx++) {
-			d->room_map[by][bx] = FALSE;
-		}
-	}
+static void set_level_feeling(struct cave *c)
+{
+	place_feeling(c);
+	c->feeling = calc_obj_feeling(c) + calc_mon_feeling(c);
 }
+
 
 /**
  * Generate a random level.
  *
  * Confusingly, this function also generate the town level (level 0).
  */
-void cave_generate(struct cave *c, struct player *p) {
-	const char *error = "no generation";
-	int tries = 0;
+void cave_generate(struct cave *c, struct player *p)
+{
+	int i, tries = 0;
+	bool done = FALSE;
 
-	assert(c);
-
+	/* Initialize the cave to the player's current depth */
 	c->depth = p->depth;
 
 	/* Generate */
-	for (tries = 0; tries < 100 && error; tries++) {
+	for (tries = 0; tries < 100; tries++) {
 		struct dun_data dun_body;
+		bool ok = FALSE;
 
-		error = NULL;
+		/* Clear leftover cave data */
 		cave_clear(c, p);
 
 		/* Mark the dungeon as being unready (to avoid artifact loss, etc) */
@@ -958,30 +909,25 @@ void cave_generate(struct cave *c, struct player *p) {
 
 		/* Allocate global data (will be freed when we leave the loop) */
 		dun = &dun_body;
+		dun->profile = &default_profile;
 		clear_dun_data(dun);
 
-		if (p->depth == 0) {
-			dun->profile = &town_profile;
-			dun->profile->builder(c, p);
-		} else {
+		if (c->depth > 0) {
 			int perc = randint0(100);
-			int last = NUM_CAVE_PROFILES - 1;
-			int i;
-			for (i = 0; i < NUM_CAVE_PROFILES; i++) {
-				bool ok;
-				const struct cave_profile *profile;
+			if (!ok && perc < 1) ok = labyrinth_gen(c, p);
+			if (!ok && perc < 10) ok = cavern_gen(c, p);
+			if (!ok) ok = default_gen(c, p);
+		} else {
+			ok = town_gen(c, p);
+		}
 
-				profile = dun->profile = &cave_profiles[i];
-				if (i < last && profile->cutoff < perc) continue;
-
-				ok = dun->profile->builder(c, p);
-				if (ok) break;
-			}
+		if (!ok) {
+			ROOM_LOG("Generation restarted: builder failed.");
+			continue;
 		}
 
 		/* Ensure quest monsters */
 		if (is_quest(c->depth)) {
-			int i;
 			for (i = 1; i < z_info->r_max; i++) {
 				monster_race *r_ptr = &r_info[i];
 				int y, x;
@@ -997,23 +943,27 @@ void cave_generate(struct cave *c, struct player *p) {
 			}
 		}
 
-		/* Place dungeon squares to trigger feeling */
-		place_feeling(c);
-		
-		c->feeling = calc_obj_feeling(c) + calc_mon_feeling(c);
+		/* Generate level feelings */
+		set_level_feeling(c);
 
 		/* Regenerate levels that overflow their maxima */
-		if (o_max >= z_info->o_max) 
-			error = "too many objects";
-		if (cave_monster_max(cave) >= z_info->m_max)
-			error = "too many monsters";
+		if (o_max >= z_info->o_max) {
+			ROOM_LOG("Generation restarted: too many objects");
+			continue;
+		}
 
-		if (error) ROOM_LOG("Generation restarted: %s.", error);
+		if (cave_monster_max(cave) >= z_info->m_max) {
+			ROOM_LOG("Generation restarted: too many monsters");
+			continue;
+		}
+
+		done = TRUE;
+		break;
 	}
 
 	free_cave_squares();
 
-	if (error) quit_fmt("cave_generate() failed 100 times!");
+	if (!done) quit_fmt("cave_generate() failed 100 times!");
 
 	/* The dungeon is ready */
 	character_dungeon = TRUE;
