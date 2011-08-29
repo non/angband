@@ -3,6 +3,19 @@
 #ifndef GEN_UTIL_H
 #define GEN_UTIL_H
 
+
+/**
+ * Convenient macros for debugging level generation.
+ */
+#if  __STDC_VERSION__ < 199901L
+# define ROOM_DEBUG if (0) msg;
+# define ROOM_LOG  if (OPT(cheat_room)) msg
+#else
+# define ROOM_DEBUG(...) if (0) msg(__VA_ARGS__);
+# define ROOM_LOG(...) if (OPT(cheat_room)) msg(__VA_ARGS__);
+#endif
+
+
 /*
  * Dungeon allocation places and types, used with alloc_object().
  */
@@ -16,6 +29,23 @@
 #define TYP_OBJECT 5 /* Object */
 #define TYP_GOOD 6 /* Great object */
 #define TYP_GREAT 7 /* Great object */
+
+/*
+ * Maximum numbers of rooms along each axis (currently 6x18).
+ * Used for building fixed-size arrays.
+ */
+#define MAX_ROOMS_ROW (DUNGEON_HGT / BLOCK_HGT)
+#define MAX_ROOMS_COL (DUNGEON_WID / BLOCK_WID)
+
+/*
+ * Bounds on some arrays used in the "dun_data" structure.
+ * These bounds are checked, though usually this is a formality.
+ */
+#define CENT_MAX 100
+#define DOOR_MAX 200
+#define WALL_MAX 500
+#define TUNN_MAX 900
+
 
 void alloc_objects(struct cave *c, int set, int typ, int num, int depth, byte origin);
 bool alloc_object(struct cave *c, int set, int typ, int depth, byte origin);
@@ -57,6 +87,16 @@ void fill_circle(struct cave *c, int y0, int x0, int radius, int border, int fea
 void alloc_stairs(struct cave *c, int feat, int num, int walls);
 
 int set_pit_type(int depth, int type);
+
+int lab_toi(int y, int x, int w);
+void lab_toyx(int i, int w, int *y, int *x);
+void lab_get_adjoin(int i, int w, int *a, int *b);
+bool lab_is_tunnel(struct cave *c, int y, int x);
+
+void array_filler(int data[], int value, int size);
+void build_colors(struct cave *c, int colors[], int counts[], bool diagonal);
+void join_regions(struct cave *c, int colors[], int counts[]);
+void ensure_connectedness(struct cave *c);
 
 #endif /* GENERATE_H */
 

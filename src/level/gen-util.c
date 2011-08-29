@@ -31,18 +31,6 @@
 
 
 /**
- * Convenient macros for debugging level generation.
- */
-#if  __STDC_VERSION__ < 199901L
-# define ROOM_DEBUG if (0) msg;
-# define ROOM_LOG  if (OPT(cheat_room)) msg
-#else
-# define ROOM_DEBUG(...) if (0) msg(__VA_ARGS__);
-# define ROOM_LOG(...) if (OPT(cheat_room)) msg(__VA_ARGS__);
-#endif
-
-
-/**
  * This is a global array of positions in the cave we're currently
  * generating. It's used to quickly randomize all the current cave positions.
  */
@@ -685,4 +673,312 @@ int set_pit_type(int depth, int type)
 	  	get_mon_num_hook = mon_pit_hook;
         
 	  	return pit_idx;
+}
+
+
+/**
+ * Used to convert (x, y) into an array index (i) in labyrinth_gen().
+ */
+int lab_toi(int y, int x, int w)
+{
+	  	return y * w + x;
+}
+
+/**
+ * Used to convert an array index (i) into (x, y) in labyrinth_gen().
+ */
+void lab_toyx(int i, int w, int *y, int *x)
+{
+	  	*y = i / w;
+	  	*x = i % w;
+}
+
+/**
+ * Given an adjoining wall (a wall which separates two labyrinth cells)
+ * set a and b to point to the cell indices which are separated. Used by
+ * labyrinth_gen().
+ */
+void lab_get_adjoin(int i, int w, int *a, int *b)
+{
+	  	int y, x;
+	  	lab_toyx(i, w, &y, &x);
+	  	if (x % 2 == 0) {
+	  		  	*a = lab_toi(y - 1, x, w);
+	  		  	*b = lab_toi(y + 1, x, w);
+	  	} else {
+	  		  	*a = lab_toi(y, x - 1, w);
+	  		  	*b = lab_toi(y, x + 1, w);
+	  	}
+}
+
+/**
+ * Return whether (x, y) is in a tunnel.
+ *
+ * For our purposes a tunnel is a horizontal or vertical path, not an
+ * intersection. Thus, we want the squares on either side to walls in one
+ * case (e.g. up/down) and open in the other case (e.g. left/right). We don't
+ * want a square that represents an intersection point.
+ *
+ * The high-level idea is that these are squares which can't be avoided (by
+ * walking diagonally around them).
+ */
+bool lab_is_tunnel(struct cave *c, int y, int x)
+{
+	  	bool west = cave_isopen(c, y, x - 1);
+	  	bool east = cave_isopen(c, y, x + 1);
+	  	bool north = cave_isopen(c, y - 1, x);
+	  	bool south = cave_isopen(c, y + 1, x);
+
+	  	return north == south && west == east && north != west;
+}
+
+
+
+/**
+ * Fill an int[] with a single value.
+ */
+void array_filler(int data[], int value, int size)
+{
+	  	int i;
+	  	for (i = 0; i < size; i++) data[i] = value;
+}
+
+/**
+ * Determine if we need to worry about coloring a point, or can ignore it.
+ */
+static int ignore_point(struct cave *c, int colors[], int y, int x)
+{
+	  	int h = c->height;
+	  	int w = c->width;
+	  	int n = lab_toi(y, x, w);
+
+	  	if (y < 0 || x < 0 || y >= h || x >= w) return TRUE;
+	  	if (colors[n]) return TRUE;
+	  	if (cave_isvault(c, y, x)) return FALSE;
+	  	if (cave_ispassable(c, y, x)) return FALSE;
+	  	if (cave_isdoor(c, y, x)) return FALSE;
+	  	return TRUE;
+}
+
+static int xds[] = {0, 0, 1, -1, -1, -1, 1, 1};
+static int yds[] = {1, -1, 0, 0, -1, 1, -1, 1};
+
+/**
+ * Color a particular point, and all adjacent points.
+ */
+static void build_color_point(struct cave *c, int colors[], int counts[], int y, int x, int color, bool diagonal)
+{
+	  	int h = c->height;
+	  	int w = c->width;
+	  	int size = h * w;
+	  	struct queue *queue = q_new(size);
+
+	  	int dslimit = diagonal ? 8 : 4;
+
+	  	int *added = C_ZNEW(size, int);
+	  	array_filler(added, 0, size);
+
+	  	q_push_int(queue, lab_toi(y, x, w));
+
+	  	counts[color] = 0;
+
+	  	while (q_len(queue) > 0) {
+	  		  	int i, y2, x2;
+	  		  	int n2 = q_pop_int(queue);
+
+	  		  	lab_toyx(n2, w, &y2, &x2);
+
+	  		  	if (ignore_point(cave, colors, y2, x2)) continue;
+
+	  		  	colors[n2] = color;
+	  		  	counts[color]++;
+
+	  		  	for (i = 0; i < dslimit; i++) {
+	  		  		  	int y3 = y2 + yds[i];
+	  		  		  	int x3 = x2 + xds[i];
+	  		  		  	int n3 = lab_toi(y3, x3, w);
+	  		  		  	if (ignore_point(cave, colors, y3, x3)) continue;
+	  		  		  	if (added[n3]) continue;
+
+	  		  		  	q_push_int(queue, n3);
+	  		  		  	added[n3] = 1;
+	  		  	}
+	  	}
+
+	  	FREE(added);
+	  	q_free(queue);
+}
+
+/**
+ * Create a color for each "NESW contiguous" region of the dungeon.
+ */
+void build_colors(struct cave *c, int colors[], int counts[], bool diagonal)
+{
+	  	int y, x;
+	  	int h = c->height;
+	  	int w = c->width;
+	  	int color = 1;
+
+	  	for (y = 0; y < h; y++) {
+	  		  	for (x = 0; x < w; x++) {
+	  		  		  	if (ignore_point(cave, colors, y, x)) continue;
+	  		  		  	build_color_point(cave, colors, counts, y, x, color, diagonal);
+	  		  		  	color++;
+	  		  	}
+	  	}
+}
+
+
+/**
+ * Return the number of colors which have active cells.
+ */
+static int count_colors(int counts[], int size)
+{
+	  	int i;
+	  	int num = 0;
+	  	for (i = 0; i < size; i++) if (counts[i] > 0) num++;
+	  	return num;
+}
+
+/**
+ * Return the first color which has one or more active cells.
+ */
+static int first_color(int counts[], int size)
+{
+	  	int i;
+	  	for (i = 0; i < size; i++) if (counts[i] > 0) return i;
+	  	return -1;
+}
+
+/**
+ * Find all cells of 'fromcolor' and repaint them to 'tocolor'.
+ */
+static void fix_colors(int colors[], int counts[], int from, int to, int size)
+{
+	  	int i;
+	  	for (i = 0; i < size; i++) if (colors[i] == from) colors[i] = to;
+	  	counts[to] += counts[from];
+	  	counts[from] = 0;
+}
+
+/**
+ * Create a tunnel connecting a region to one of its nearest neighbors.
+ */
+static void join_region(struct cave *c, int colors[], int counts[], int color)
+{
+	  	int i;
+	  	int h = c->height;
+	  	int w = c->width;
+	  	int size = h * w;
+
+	  	/* Allocate a processing queue */
+	  	struct queue *queue = q_new(size);
+
+	  	/* Allocate an array to keep track of handled squares, and which square
+	  	 * we reached them from.
+	  	 */
+	  	int *previous = C_ZNEW(size, int);
+	  	array_filler(previous, -1, size);
+
+	  	/* Push all squares of the given color onto the queue */
+	  	for (i = 0; i < size; i++) {
+	  		  	if (colors[i] == color) {
+	  		  		  	q_push_int(queue, i);
+	  		  		  	previous[i] = i;
+	  		  	}
+	  	}
+
+	  	/* Process all squares into the queue */
+	  	while (q_len(queue) > 0) {
+	  		  	/* Get the current square and its color */
+	  		  	int n = q_pop_int(queue);
+	  		  	int color2 = colors[n];
+
+	  		  	/* See if we've reached a square with a new color */
+	  		  	if (color2 && color2 != color) {
+	  		  		  	/* Step backward through the path, turning stone to tunnel */
+	  		  		  	while (colors[n] != color) {
+	  		  		  		  	int x, y;
+	  		  		  		  	lab_toyx(n, w, &y, &x);
+	  		  		  		  	colors[n] = color;
+	  		  		  		  	if (!cave_isperm(c, y, x) && !cave_isvault(c, y, x)) {
+	  		  		  		  		  	cave_set_feat(c, y, x, FEAT_FLOOR);
+	  		  		  		  	}
+	  		  		  		  	n = previous[n];
+	  		  		  	}
+
+	  		  		  	/* Update the color mapping to combine the two colors */
+	  		  		  	fix_colors(colors, counts, color2, color, size);
+
+	  		  		  	/* We're done now */
+	  		  		  	break;
+	  		  	}
+
+	  		  	/* If we haven't reached a new color, add all the unprocessed adjacent
+	  		  	 * squares to our queue.
+	  		  	 */
+	  		  	for (i = 0; i < 4; i++) {
+	  		  		  	int y, x, n2;
+	  		  		  	lab_toyx(n, w, &y, &x);
+
+	  		  		  	/* Move to the adjacent square */
+	  		  		  	y += yds[i];
+	  		  		  	x += xds[i];
+
+	  		  		  	/* make sure we stay inside the boundaries */
+	  		  		  	if (y < 0 || y >= h) continue;
+	  		  		  	if (x < 0 || x >= w) continue;
+
+	  		  		  	/* If the cell hasn't already been procssed, add it to the queue */
+	  		  		  	n2 = lab_toi(y, x, w);
+	  		  		  	if (previous[n2] >= 0) continue;
+	  		  		  	q_push_int(queue, n2);
+	  		  		  	previous[n2] = n;
+	  		  	}
+	  	}
+
+	  	/* Free the memory we've allocated */
+	  	q_free(queue);
+	  	FREE(previous);
+}
+
+
+/**
+ * Start connecting regions, stopping when the cave is entirely connected.
+ */
+void join_regions(struct cave *c, int colors[], int counts[])
+{
+	  	int h = c->height;
+	  	int w = c->width;
+	  	int size = h * w;
+	  	int num = count_colors(counts, size);
+
+	  	/* While we have multiple colors (i.e. disconnected regions), join one of
+	  	 * the regions to another one.
+	  	 */
+	  	while (num > 1) {
+	  		  	int color = first_color(counts, size);
+	  		  	join_region(c, colors, counts, color);
+	  		  	num--;
+	  	}
+}
+
+
+/**
+ * Make sure that all the regions of the dungeon are connected.
+ *
+ * This function colors each connected region of the dungeon, then uses that
+ * information to join them into one conected region.
+ */
+void ensure_connectedness(struct cave *c)
+{
+	  	int size = c->height * c->width;
+	  	int *colors = C_ZNEW(size, int);
+	  	int *counts = C_ZNEW(size, int);
+
+	  	build_colors(c, colors, counts, TRUE);
+	  	join_regions(c, colors, counts);
+
+	  	FREE(colors);
+	  	FREE(counts);
 }
