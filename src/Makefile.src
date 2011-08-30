@@ -81,9 +81,10 @@ ANGFILES = \
 	history.o \
 	init2.o \
 	keymap.o \
+	level/castle.o \
+	level/cavern.o \
 	level/gen-util.o \
 	level/generate.o \
-	level/cavern.o \
 	level/labyrinth.o \
 	level/room.o \
 	level/town.o \

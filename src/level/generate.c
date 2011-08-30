@@ -23,6 +23,7 @@
 #include "files.h"
 #include "level/gen-util.h"
 #include "level/generate.h"
+#include "level/castle.h"
 #include "level/cavern.h"
 #include "level/labyrinth.h"
 #include "level/town.h"
@@ -914,6 +915,7 @@ void cave_generate(struct cave *c, struct player *p)
 
 		if (c->depth > 0) {
 			int perc = randint0(100);
+			if (!ok) ok = castle_gen(c, p);
 			if (!ok && perc < 1) ok = labyrinth_gen(c, p);
 			if (!ok && perc < 10) ok = cavern_gen(c, p);
 			if (!ok) ok = default_gen(c, p);

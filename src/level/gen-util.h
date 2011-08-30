@@ -3,6 +3,7 @@
 #ifndef GEN_UTIL_H
 #define GEN_UTIL_H
 
+#include "z-type.h"
 
 /**
  * Convenient macros for debugging level generation.
@@ -45,7 +46,6 @@
 #define DOOR_MAX 200
 #define WALL_MAX 500
 #define TUNN_MAX 900
-
 
 void alloc_objects(struct cave *c, int set, int typ, int num, int depth, byte origin);
 bool alloc_object(struct cave *c, int set, int typ, int depth, byte origin);
