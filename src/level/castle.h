@@ -1,4 +1,4 @@
-/* level/gen-util.h - dungeon generation utility functions */
+/* level/castle.h - castle generation */
 
 #ifndef CASTLE_H
 #define CASTLE_H

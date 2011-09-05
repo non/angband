@@ -1,14 +1,11 @@
-/* level/generate.h - dungeon generation interface */
+/* level/generate.h - dungeon generation */
 
 #ifndef GENERATE_H
 #define GENERATE_H
 
 #include "level/gen-util.h"
 
-//void ensure_connectedness(struct cave *c);
-
-void place_object(struct cave *c, int y, int x, int level, bool good,
-	bool great, byte origin);
+void place_object(struct cave *c, int y, int x, int level, bool good, bool great, byte origin);
 void place_gold(struct cave *c, int y, int x, int level, byte origin);
 void place_secret_door(struct cave *c, int y, int x);
 void place_closed_door(struct cave *c, int y, int x);

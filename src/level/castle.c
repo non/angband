@@ -1,8 +1,7 @@
 /*
- * File: generate.c
- * Purpose: Dungeon generation.
+ * File: castle.c
+ * Purpose: Castle generation.
  *
- * Copyright (c) 1997 Ben Harrison, James E. Wilson, Robert A. Koeneke
  * Copyright (c) 2011 Erik Osheim
  *
  * This work is free software; you can redistribute it and/or modify it

@@ -1,4 +1,4 @@
-/* level/gen-util.h - dungeon generation utility functions */
+/* level/room.h - room generation */
 
 #ifndef ROOM_H
 #define ROOM_H

@@ -16,7 +16,6 @@
 # define ROOM_LOG(...) if (OPT(cheat_room)) msg(__VA_ARGS__);
 #endif
 
-
 /*
  * Dungeon allocation places and types, used with alloc_object().
  */

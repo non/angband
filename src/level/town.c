@@ -1,6 +1,6 @@
 /*
- * File: generate.c
- * Purpose: Dungeon generation.
+ * File: town.c
+ * Purpose: Town generation.
  *
  * Copyright (c) 1997 Ben Harrison, James E. Wilson, Robert A. Koeneke
  * Copyright (c) 2011 Erik Osheim

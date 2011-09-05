@@ -1,4 +1,4 @@
-/* level/gen-util.h - dungeon generation utility functions */
+/* level/town.h - town generation */
 
 #ifndef TOWN_H
 #define TOWN_H

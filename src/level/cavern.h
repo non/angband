@@ -1,4 +1,4 @@
-/* level/gen-util.h - dungeon generation utility functions */
+/* level/cavern.h - cavern generation */
 
 #ifndef CAVERN_H
 #define CAVERN_H
