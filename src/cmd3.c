@@ -122,6 +122,8 @@ void textui_cmd_destroy(void)
 	menu_type *m;
 	region r;
 	int selected;
+	byte value;
+	int type;
 
 	/* Get an item */
 	const char *q = "Ignore which item? ";
@@ -159,21 +161,18 @@ void textui_cmd_destroy(void)
 	}
 
 	/* Quality squelching */
-	if (object_was_sensed(o_ptr) || object_was_worn(o_ptr) ||
-			object_is_known_not_artifact(o_ptr)) {
-		byte value = squelch_level_of(o_ptr);
-		int type = squelch_type_of(o_ptr);
+	value = squelch_level_of(o_ptr);
+	type = squelch_type_of(o_ptr);
 
-		if (object_is_jewelry(o_ptr) &&
-					squelch_level_of(o_ptr) != SQUELCH_BAD)
-			value = SQUELCH_MAX;
+	if (object_is_jewelry(o_ptr) &&
+				squelch_level_of(o_ptr) != SQUELCH_BAD)
+		value = SQUELCH_MAX;
 
-		if (value != SQUELCH_MAX && type != TYPE_MAX) {
-			strnfmt(out_val, sizeof out_val, "All %s %s",
-					quality_values[value].name, quality_choices[type].name);
+	if (value != SQUELCH_MAX && type != TYPE_MAX) {
+		strnfmt(out_val, sizeof out_val, "All %s %s",
+				quality_values[value].name, quality_choices[type].name);
 
-			menu_dynamic_add(m, out_val, IGNORE_THIS_QUALITY);
-		}
+		menu_dynamic_add(m, out_val, IGNORE_THIS_QUALITY);
 	}
 
 	/* work out display region */

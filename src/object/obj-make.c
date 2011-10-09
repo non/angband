@@ -65,11 +65,28 @@ static int get_new_attr(bitflag flags[OF_SIZE], bitflag newf[OF_SIZE])
 
 
 /**
+ * \returns whether an ego can be applied to an object with a particular tval and sval.
+ */
+bool ego_applies(const ego_item_type *e_ptr, byte tval, byte sval)
+{
+	int i;
+
+	if (!e_ptr->rarity) return FALSE;
+
+	for (i = 0; i < EGO_TVALS_MAX; i++)
+		if ((e_ptr->tval[i] == tval) && (e_ptr->min_sval[i] <= sval) && (e_ptr->max_sval[i] >= sval))
+			return TRUE;
+
+	return FALSE;
+}
+ 
+
+/**
  * Select an ego-item that fits the object's tval and sval.
  */
 static struct ego_item *ego_find_random(object_type *o_ptr, int level)
 {
-	int i, j;
+	int i;
 	long total = 0L;
 
 	/* XXX alloc_ego_table &c should be static to this file */
@@ -90,16 +107,8 @@ static struct ego_item *ego_find_random(object_type *o_ptr, int level)
 		/* XXX Ignore cursed items for now */
 		if (cursed_p(ego->flags)) continue;
 
-		/* Test if this is a legal ego-item type for this object */
-		for (j = 0; j < EGO_TVALS_MAX; j++) {
-			/* Require identical base type */
-			if (o_ptr->tval == ego->tval[j] &&
-					o_ptr->sval >= ego->min_sval[j] &&
-					o_ptr->sval <= ego->max_sval[j]) {
-				table[i].prob3 = table[i].prob2;
-				break;
-			}
-		}
+		if (ego_applies(ego, o_ptr->tval, o_ptr->sval))
+			table[i].prob3 = table[i].prob2;
 
 		/* Total */
 		total += table[i].prob3;

@@ -1098,6 +1098,7 @@ bool detect_monsters_evil(bool aware)
 				/* Redraw stuff */
 				p_ptr->redraw |= (PR_MONSTER);
 			}
+m_ptr->mflag |= (MFLAG_MARK | MFLAG_SHOW);
 
 			/* Detect the monster */
 			m_ptr->mflag |= (MFLAG_MARK | MFLAG_SHOW);
@@ -3304,8 +3305,6 @@ void do_ident_item(int item, object_type *o_ptr)
 	char o_name[80];
 
 	u32b msg_type = 0;
-	int i;
-	bool bad = TRUE;
 
 	/* Identify it */
 	object_flavor_aware(o_ptr);
@@ -3329,14 +3328,7 @@ void do_ident_item(int item, object_type *o_ptr)
 	/* Description */
 	object_desc(o_name, sizeof(o_name), o_ptr, ODESC_PREFIX | ODESC_FULL);
 
-	/* Determine the message type. */
-	/* CC: we need to think more carefully about how we define "bad" with
-	 * multiple pvals - currently using "all nonzero pvals < 0" */
-	for (i = 0; i < o_ptr->num_pvals; i++)
-		if (o_ptr->pval[i] > 0)
-			bad = FALSE;
-
-	if (bad)
+	if (object_is_known_bad(o_ptr))
 		msg_type = MSG_IDENT_BAD;
 	else if (o_ptr->artifact)
 		msg_type = MSG_IDENT_ART;
@@ -3344,10 +3336,6 @@ void do_ident_item(int item, object_type *o_ptr)
 		msg_type = MSG_IDENT_EGO;
 	else
 		msg_type = MSG_GENERIC;
-
-	/* Log artifacts to the history list. */
-	if (o_ptr->artifact)
-		history_add_artifact(o_ptr->artifact, TRUE, TRUE);
 
 	/* Describe */
 	if (item >= INVEN_WIELD)

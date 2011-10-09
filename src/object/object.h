@@ -70,13 +70,10 @@ enum {
 #define IDENT_EFFECT    0x0080  /* Know item activation/effect */
 /* xxx */
 #define IDENT_INDESTRUCT 0x0200 /* Tried to destroy it and failed */
-#define IDENT_NAME      0x0400  /* Know the name of ego or artifact if there is one */
+#define IDENT_NAME      0x0400  /* Know whether the object has a name [no name means avg or magical] and, if so, what it is */
 #define IDENT_FIRED     0x0800  /* Has been used as a missile */
-#define IDENT_NOTART    0x1000  /* Item is known not to be an artifact */
+#define IDENT_NOTICE_ART    0x1000  /* Item is known whether an artifact */
 #define IDENT_FAKE      0x2000  /* Item is a fake, for displaying knowledge */
-
-/* Whether to learn egos and flavors with less than complete information */
-#define EASY_LEARN 1
 
 /* Maximum number of scroll titles generated */
 #define MAX_TITLES     50
@@ -521,14 +518,21 @@ typedef struct flavor {
 /*** Functions ***/
 
 /* identify.c */
+/*
 extern s32b object_last_wield;
+*/
 
 bool object_is_known(const object_type *o_ptr);
 bool object_is_known_artifact(const object_type *o_ptr);
 bool object_is_known_cursed(const object_type *o_ptr);
 bool object_is_known_blessed(const object_type *o_ptr);
 bool object_is_known_not_artifact(const object_type *o_ptr);
+bool object_is_known_splendid(const object_type *o_ptr);
+bool object_is_known_unsplendid(const object_type *o_ptr);
+bool object_is_known_bad(const object_type *o_ptr);
 bool object_is_not_known_consistently(const object_type *o_ptr);
+bool object_is_not_excellent(const object_type *o_ptr);
+bool object_is_known_not_excellent(const object_type *o_ptr);
 bool object_was_worn(const object_type *o_ptr);
 bool object_was_fired(const object_type *o_ptr);
 bool object_was_sensed(const object_type *o_ptr);
@@ -538,7 +542,9 @@ bool object_effect_is_known(const object_type *o_ptr);
 bool object_ego_is_visible(const object_type *o_ptr);
 bool object_attack_plusses_are_visible(const object_type *o_ptr);
 bool object_defence_plusses_are_visible(const object_type *o_ptr);
-bool object_flag_is_known(const object_type *o_ptr, int flag);
+bool object_flag_is_known(const object_type *o_ptr, flag_type flag);
+int object_number_of_learnable_flags(const object_type *o_ptr);
+int object_num_unlearned_flags(const object_type *o_ptr);
 bool object_high_resist_is_possible(const object_type *o_ptr);
 void object_flavor_aware(object_type *o_ptr);
 void object_flavor_tried(object_type *o_ptr);
@@ -546,17 +552,21 @@ void object_notice_everything(object_type *o_ptr);
 void object_notice_indestructible(object_type *o_ptr);
 void object_notice_ego(object_type *o_ptr);
 void object_notice_sensing(object_type *o_ptr);
-void object_sense_artifact(object_type *o_ptr);
+//void object_sense_artifact(object_type *o_ptr);
+void object_notice_artifact(object_type *o_ptr);
 void object_notice_effect(object_type *o_ptr);
 void object_notice_attack_plusses(object_type *o_ptr);
-bool object_notice_flag(object_type *o_ptr, int flag);
+//bool object_notice_flag(object_type *o_ptr, int flag);
+bool object_notice_flag(object_type *o_ptr, flag_type flag);
 bool object_notice_flags(object_type *o_ptr, bitflag flags[OF_SIZE]);
 bool object_notice_curses(object_type *o_ptr);
 void object_notice_on_defend(struct player *p);
 void object_notice_on_wield(object_type *o_ptr);
 void object_notice_on_firing(object_type *o_ptr);
-void wieldeds_notice_flag(struct player *p, int flag);
-void wieldeds_notice_on_attack(void);
+void wieldeds_notice_flag(struct player *p, flag_type flag);
+void wieldeds_notice_offweapon_attack_plusses(void);
+//void wieldeds_notice_flag(struct player *p, int flag);
+//void wieldeds_notice_on_attack(void);
 void object_repair_knowledge(object_type *o_ptr);
 bool object_FA_would_be_obvious(const object_type *o_ptr);
 obj_pseudo_t object_pseudo(const object_type *o_ptr);
@@ -572,6 +582,11 @@ void object_kind_name(char *buf, size_t max, const object_kind *kind, bool easy_
 size_t obj_desc_name_format(char *buf, size_t max, size_t end, const char *fmt, const char *modstr, bool pluralise);
 size_t object_desc(char *buf, size_t max, const object_type *o_ptr, odesc_detail_t mode);
 
+/* obj-flags.c */
+void of_unlearnable_mask(bitflag unlearnable[OF_SIZE]);
+void of_curse_mask(bitflag unlearnable[OF_SIZE]);
+void of_pval_mask(bitflag unlearnable[OF_SIZE]);
+
 /* obj-info.c */
 textblock *object_info(const object_type *o_ptr, oinfo_detail_t mode);
 textblock *object_info_ego(struct ego_item *ego);
@@ -579,6 +594,7 @@ void object_info_spoil(ang_file *f, const object_type *o_ptr, int wrap);
 void object_info_chardump(ang_file *f, const object_type *o_ptr, int indent, int wrap);
 
 /* obj-make.c */
+bool ego_applies(const ego_item_type *e_ptr, byte tval, byte sval);
 void free_obj_alloc(void);
 bool init_obj_alloc(void);
 object_kind *get_obj_num(int level, bool good);
@@ -598,10 +614,14 @@ bool verify_item(const char *prompt, int item);
 bool get_item(int *cp, const char *pmt, const char *str, cmd_code cmd, int mode);
 
 /* obj-util.c */
+bool object_can_be_sensed(const object_type *o_ptr);
+bool object_base_only_defensive(const object_type *o_ptr);
+bool object_base_only_offensive(const object_type *o_ptr);
 struct object_kind *objkind_get(int tval, int sval);
 struct object_kind *objkind_byid(int kidx);
 void flavor_init(void);
 void reset_visuals(bool load_prefs);
+void object_kind_flags(const object_kind *kind, bitflag flags[OF_SIZE]);
 void object_flags(const object_type *o_ptr, bitflag flags[OF_SIZE]);
 void object_flags_known(const object_type *o_ptr, bitflag flags[OF_SIZE]);
 char index_to_label(int i);
@@ -609,6 +629,7 @@ s16b label_to_inven(int c);
 s16b label_to_equip(int c);
 bool wearable_p(const object_type *o_ptr);
 s16b wield_slot(const object_type *o_ptr);
+s16b base_wield_slot(const object_base *base);
 bool slot_can_wield_item(int slot, const object_type *o_ptr);
 const char *mention_use(int slot);
 const char *describe_use(int i);
@@ -676,6 +697,7 @@ bool obj_is_food(const object_type *o_ptr);
 bool obj_is_light(const object_type *o_ptr);
 bool obj_is_ring(const object_type *o_ptr);
 bool obj_is_ammo(const object_type *o_ptr);
+bool base_is_ammo(const object_base *base);
 bool obj_has_charges(const object_type *o_ptr);
 bool obj_can_zap(const object_type *o_ptr);
 bool obj_is_activatable(const object_type *o_ptr);

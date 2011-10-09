@@ -4,6 +4,7 @@
  *
  * Copyright (c) 1997 Ben Harrison, James E. Wilson, Robert A. Koeneke
  * Copyright (c) 2009 Brian Bull
+ * Copyright (c) 2011 Edward F. Grove
  *
  * This work is free software; you can redistribute it and/or modify it
  * under the terms of either:
@@ -17,6 +18,19 @@
  *    are included in all such copies.  Other copyrights may also apply.
  */
 
+/*
+ * Some standard naming conventions for all functions below
+ *
+ * o_ptr	is the object being identified
+ * o_flags 	are the actual flags of the object
+ * k_flags	are the flags of a kind, including flags inherited from base tval
+ * o_known	are the flags known by the char to be in the object
+ * obvious_mask	is the set of flags that would be obvious on the object
+ * curse_mask	is the set of flags for curses
+ * pval_mask	is the set of flags with pvals
+ */
+
+
 #include "angband.h"
 #include "cave.h"
 #include "game-event.h"
@@ -28,7 +42,9 @@
 #include "squelch.h"
 
 /** Time last item was wielded */
-s32b object_last_wield;
+/* EFG evil global, was externed, but not used elsewhere and not put into savefile
+ *     save/reload to learn faster, this needs to be excised soon */
+static s32b object_last_wield = 0;
 
 /*** Knowledge accessor functions ***/
 
@@ -58,8 +74,7 @@ bool object_is_known(const object_type *o_ptr)
  */
 bool object_is_known_artifact(const object_type *o_ptr)
 {
-	return (o_ptr->ident & IDENT_INDESTRUCT) ||
-			(o_ptr->artifact && object_was_sensed(o_ptr));
+	return (o_ptr->artifact && (o_ptr->ident & IDENT_NOTICE_ART));
 }
 
 /**
@@ -67,14 +82,32 @@ bool object_is_known_artifact(const object_type *o_ptr)
  */
 bool object_is_known_cursed(const object_type *o_ptr)
 {
-	bitflag f[OF_SIZE], f2[OF_SIZE];
+	bitflag o_known[OF_SIZE], curse_mask[OF_SIZE];
 
-	object_flags_known(o_ptr, f);
+	object_flags_known(o_ptr, o_known);
+
+	of_curse_mask(curse_mask);
+
+	return of_is_inter(o_known, curse_mask);
+}
+
+/**
+ * \returns whether the object is known to be cursed
+ */
+bool object_is_known_not_cursed(const object_type *o_ptr)
+{
+	bitflag o_flags[OF_SIZE], curse_mask[OF_SIZE];
 
 	/* Gather whatever curse flags there are to know */
-	create_mask(f2, FALSE, OFT_CURSE, OFT_MAX);
+	of_curse_mask(curse_mask);
 
-	return of_is_inter(f, f2);
+	/* if you don't know a curse flag, might be cursed */
+	if (!of_is_subset(o_ptr->known_flags, curse_mask))
+		return FALSE;
+
+	object_flags(o_ptr, o_flags);
+
+	return of_is_inter(o_flags, curse_mask) ? FALSE : TRUE;
 }
 
 /**
@@ -82,11 +115,11 @@ bool object_is_known_cursed(const object_type *o_ptr)
  */
 bool object_is_known_blessed(const object_type *o_ptr)
 {
-	bitflag f[OF_SIZE];
+	bitflag o_known[OF_SIZE];
 
-	object_flags_known(o_ptr, f);
+	object_flags_known(o_ptr, o_known);
 
-	return (of_has(f, OF_BLESSED)) ? TRUE : FALSE;
+	return of_has(o_known, OF_BLESSED);
 }
 
 /**
@@ -94,11 +127,79 @@ bool object_is_known_blessed(const object_type *o_ptr)
  */
 bool object_is_known_not_artifact(const object_type *o_ptr)
 {
-	if (o_ptr->ident & IDENT_NOTART)
-		return TRUE;
-
-	return FALSE;
+	return (o_ptr->ident & IDENT_NOTICE_ART) && !o_ptr->artifact;
 }
+
+ /**
+ * \returns whether the effect exists and is known 
+ */
+bool object_has_known_effect(const object_type *o_ptr)
+{
+	assert(o_ptr->kind);
+	return o_ptr->kind->effect && object_effect_is_known(o_ptr) ? TRUE : FALSE;
+}
+
+/**
+ * \returns whether the object is neither ego nor artifact
+ */
+bool object_is_not_excellent(const object_type *o_ptr)
+{
+	return !o_ptr->artifact && !o_ptr->ego ? TRUE : FALSE;
+}
+
+/**
+ * \returns whether the object is known to be neither ego nor artifact
+ */
+bool object_is_known_not_excellent(const object_type *o_ptr)
+{
+	return object_name_is_visible(o_ptr) && object_is_not_excellent(o_ptr) ? TRUE : FALSE;
+}
+
+
+/**
+ * \returns whether the object is known to be bad
+ *
+ * currently only checking numeric values
+ *
+ * this calls amulet of inertia bad -- should it be?
+ * negative pval stat rings are bad even though they have a sustain
+ */
+bool object_is_known_bad(const object_type *o_ptr)
+{
+	int i;
+	bool something_bad = FALSE;
+	bool something_good = FALSE;
+
+	for (i = 0; i < o_ptr->num_pvals; i++) {
+		if (object_this_pval_is_visible(o_ptr, i)) {
+			if (o_ptr->pval[i] > 0)
+				something_good = TRUE;
+			else if (o_ptr->pval[i] < 0)
+				something_bad = TRUE;
+		}
+	}
+
+	if (object_attack_plusses_are_visible(o_ptr)) {
+		if (o_ptr->to_h > 0)
+			something_good = TRUE;
+		else if (o_ptr->to_h < 0)
+			something_bad = TRUE;
+		if (o_ptr->to_d > 0)
+			something_good = TRUE;
+		else if (o_ptr->to_d < 0)
+			something_bad = TRUE;
+	}
+
+	if (object_defence_plusses_are_visible(o_ptr)) {
+		if (o_ptr->to_a > 0)
+			something_good = TRUE;
+		else if (o_ptr->to_a < 0)
+			something_bad = TRUE;
+	}
+
+	return something_bad && !something_good ? TRUE : FALSE;
+}
+
 
 /**
  * \returns whether the object has been worn/wielded
@@ -155,6 +256,8 @@ bool object_effect_is_known(const object_type *o_ptr)
 
 /**
  * \returns whether any ego or artifact name is available to the player
+ *
+ * This can be TRUE for a boring object that is known to be not excellent.
  */
 bool object_name_is_visible(const object_type *o_ptr)
 {
@@ -162,13 +265,16 @@ bool object_name_is_visible(const object_type *o_ptr)
 }
 
 /**
- * \returns whether both the object is both an ego and the player knows it is
+ * \returns whether both the object is an ego and the player knows it is
  */
 bool object_ego_is_visible(const object_type *o_ptr)
 {
 	if (!o_ptr->ego)
 		return FALSE;
 
+	/* lights cannot be sensed, so ego is obvious */
+	/* EFG this seems broken -- jewelry cannot be sensed but is still learned
+	 * Should lights require learning through check_for_ident? */
 	if (o_ptr->tval == TV_LIGHT)
 		return TRUE;
 
@@ -178,19 +284,31 @@ bool object_ego_is_visible(const object_type *o_ptr)
 		return FALSE;
 }
 
+
 /**
  * \returns whether the object's attack plusses are known
  */
 bool object_attack_plusses_are_visible(const object_type *o_ptr)
 {
+	/* bare hands e.g. have visible attack plusses */
+	if (!o_ptr->kind) return TRUE;
+
 	/* Bonuses have been revealed or for sale */
 	if ((o_ptr->ident & IDENT_ATTACK) || (o_ptr->ident & IDENT_STORE))
 		return TRUE;
 
 	/* Aware jewelry with non-variable bonuses */
-	if (object_is_jewelry(o_ptr) && object_flavor_is_aware(o_ptr))
-	{
+	if (object_is_jewelry(o_ptr) && object_flavor_is_aware(o_ptr)) {
 		if (!randcalc_varies(o_ptr->kind->to_h) && !randcalc_varies(o_ptr->kind->to_d))
+			return TRUE;
+	}
+
+	/* Defensive items such as shields have fixed attack values unless ego or artifact */
+	else if (object_base_only_defensive(o_ptr)) {
+		if (object_is_known_not_excellent(o_ptr))
+			return TRUE;
+		if (o_ptr->ego && object_ego_is_visible(o_ptr)
+		    && !randcalc_varies(o_ptr->ego->to_h) && !randcalc_varies(o_ptr->ego->to_d))
 			return TRUE;
 	}
 
@@ -202,6 +320,8 @@ bool object_attack_plusses_are_visible(const object_type *o_ptr)
  */
 bool object_defence_plusses_are_visible(const object_type *o_ptr)
 {
+	if (!o_ptr->kind) return TRUE;
+
 	/* Bonuses have been revealed or for sale */
 	if ((o_ptr->ident & IDENT_DEFENCE) || (o_ptr->ident & IDENT_STORE))
 		return TRUE;
@@ -213,14 +333,22 @@ bool object_defence_plusses_are_visible(const object_type *o_ptr)
 			return TRUE;
 	}
 
+	/* Offensive items such as daggers have fixed defense values unless ego or artifact */
+	else if (object_base_only_offensive(o_ptr)) {
+		if (object_is_known_not_excellent(o_ptr))
+			return TRUE;
+		if (o_ptr->ego && object_ego_is_visible(o_ptr) && !randcalc_varies(o_ptr->ego->to_a))
+			return TRUE;
+	}
+
 	return FALSE;
 }
 
 
-/*
+/**
  * \returns whether the player knows whether an object has a given flag
  */
-bool object_flag_is_known(const object_type *o_ptr, int flag)
+bool object_flag_is_known(const object_type *o_ptr, flag_type flag)
 {
 	if (easy_know(o_ptr) ||
 	    (o_ptr->ident & IDENT_STORE) ||
@@ -231,32 +359,184 @@ bool object_flag_is_known(const object_type *o_ptr, int flag)
 }
 
 
-/*
+/**
  * \returns whether it is possible an object has a high resist given the
  *          player's current knowledge
  */
 bool object_high_resist_is_possible(const object_type *o_ptr)
 {
-	bitflag flags[OF_SIZE], f2[OF_SIZE];
+	bitflag possible[OF_SIZE], high_resists[OF_SIZE];
 
 	/* Actual object flags */
-	object_flags(o_ptr, flags);
+	object_flags(o_ptr, possible);
 
 	/* Add player's uncertainty */
-	of_comp_union(flags, o_ptr->known_flags);
+	of_comp_union(possible, o_ptr->known_flags);
 
 	/* Check for possible high resist */
-	create_mask(f2, FALSE, OFT_HRES, OFT_MAX);
-	if (of_is_inter(flags, f2))
+	create_mask(high_resists, FALSE, OFT_HRES, OFT_MAX);
+	if (of_is_inter(possible, high_resists))
 		return TRUE;
 	else
 		return FALSE;
 }
 
 
+/**
+ * \returns number of object flags in the list which are learnable
+ */
+static int num_learnable_flags(const bitflag flags[OF_SIZE])
+{
+	bitflag unlearnable[OF_SIZE];
+	flag_type i;
+	int num = 0;
 
-/*
- * Sets a some IDENT_ flags on an object.
+	of_unlearnable_mask(unlearnable);
+
+	for_each_object_flag(i) {
+		if (of_has(flags, i) && !of_has(unlearnable, i))
+			num++;
+	}
+
+	return num;
+}
+
+
+/**
+ * \returns number of learnable flags in the object that are not known yet
+ */
+int object_num_unlearned_flags(const object_type *o_ptr)
+{
+	bitflag o_flags[OF_SIZE];
+	bitflag o_known[OF_SIZE];
+	bitflag unlearnable[OF_SIZE];
+	int unknown = 0;
+	flag_type i;
+
+	object_flags(o_ptr, o_flags);
+	object_flags_known(o_ptr, o_known);
+	of_unlearnable_mask(unlearnable);
+
+	for_each_object_flag(i)
+		if (of_has(o_flags, i) && !of_has(o_known, i) && !of_has(unlearnable, i)) {
+			unknown++;
+		}
+
+	return unknown;
+}
+
+
+/**
+ * \returns number of learnable flags in the object
+ */
+int object_num_learnable_flags(const object_type *o_ptr)
+{
+	bitflag o_flags[OF_SIZE];
+	object_flags(o_ptr, o_flags);
+
+	return num_learnable_flags(o_flags);
+}
+
+
+/**
+ * Create a list of flags that are obvious on a particular kind.
+ *
+ * This should be allowed to depend upon race and class as well.
+ * If you want SI not to be obvious to high-elves, put that code here.
+ */
+void kind_obvious_mask(const object_kind *kind, bitflag flags[OF_SIZE])
+{
+	if (base_is_ammo(kind->base)) {
+		of_wipe(flags);
+		return;
+	}
+
+	create_mask(flags, TRUE, OFID_WIELD, OFT_MAX);
+
+	/* special case FA, needed at least for mages wielding gloves */
+	if (player_has(PF_CUMBER_GLOVE) && base_wield_slot(kind->base) == INVEN_HANDS)
+		of_on(flags, OF_FREE_ACT);
+
+}
+
+/**
+ * \returns whether the pval of the flag is visible
+ */
+bool object_flag_pval_is_visible(const object_type *o_ptr, flag_type flag)
+{
+	/* currently either all or no pvals are visible, depending upon worn status */
+	return object_was_worn(o_ptr);
+}
+
+/**
+ * \returns whether the player knows the object is splendid
+ */
+bool object_is_known_splendid(const object_type *o_ptr)
+{
+	bitflag o_known[OF_SIZE], k_flags[OF_SIZE], obvious_mask[OF_SIZE], pval_mask[OF_SIZE];
+	flag_type i;
+
+	assert(o_ptr->kind);
+
+	/* possibly cursed items cannot be known to be splendid */
+	if (!object_is_known_not_cursed(o_ptr))
+		return FALSE;
+
+	object_flags_known(o_ptr, o_known);
+	object_kind_flags(o_ptr->kind, k_flags);
+	kind_obvious_mask(o_ptr->kind, obvious_mask);
+	of_pval_mask(pval_mask);
+
+	/* check if any known obvious flags */
+	for_each_object_flag(i) {
+		if (of_has(o_known, i) && of_has(obvious_mask, i)) {
+			/* a pval flag in the kind, such as digging on a pick, is obvious only if the pval is visible */
+			if (of_has(pval_mask, i)) {
+				if (!of_has(k_flags, i))
+					return TRUE;
+				else if (object_flag_pval_is_visible(o_ptr, i) && o_ptr->ego)
+					return TRUE;
+			}
+			else return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+/**
+ * \returns whether the player knows the object is not splendid
+ */
+bool object_is_known_unsplendid(const object_type *o_ptr)
+{
+	bitflag known_not_in_kind[OF_SIZE], obvious_mask[OF_SIZE];
+	bitflag pval_mask[OF_SIZE], kind_only_pvals[OF_SIZE];
+
+	kind_obvious_mask(o_ptr->kind, obvious_mask);
+	object_flags_known(o_ptr, known_not_in_kind);
+
+	if (o_ptr->ego) {
+		/* collect flags with pvals due to kind not in the ego */
+		of_pval_mask(pval_mask);
+		object_kind_flags(o_ptr->kind, kind_only_pvals);
+		of_inter(kind_only_pvals, pval_mask);
+		of_diff(kind_only_pvals, o_ptr->ego->flags);
+
+		/* removed kind only pval flags before testing for obvious flags */
+		of_diff(known_not_in_kind, kind_only_pvals);
+	}
+
+	/* check if anything known obvious */
+	if (of_is_inter(known_not_in_kind, obvious_mask))
+		return FALSE;
+
+	/* make sure all possible obvious flags are accounted for */
+	return of_is_subset(o_ptr->known_flags, obvious_mask);
+}
+
+
+/**
+ * Sets some IDENT_ flags on an object.
  *
  * \param o_ptr is the object to check
  * \param flags are the ident flags to be added
@@ -275,6 +555,210 @@ static bool object_add_ident_flags(object_type *o_ptr, u32b flags)
 }
 
 
+
+/*
+ * Set the second param to be those flags known to be in the object with visible pvals
+ *
+ * Currently all pvals or none are visible, depending upon worn status.
+ */
+void object_flags_with_visible_pvals(const object_type *o_ptr, bitflag o_pvals_known[OF_SIZE])
+{
+	if (object_was_worn(o_ptr)) {
+		bitflag pval_mask[OF_SIZE];
+
+		object_flags_known(o_ptr, o_pvals_known);
+		of_pval_mask(pval_mask);
+		
+		of_inter(o_pvals_known, pval_mask);
+	}
+	else
+		of_wipe(o_pvals_known);
+}
+
+/**
+ * Counts the number of egos that are consistent with flags known by player.
+ * Count is currently not guaranteed to be exact because of imperfect checks
+ * for random powers.
+ *
+ * \returns an upper bound on the number of egos consistent with knowledge of the object
+ */
+static int num_matching_egos(const object_type *o_ptr)
+{
+	int num = 0;
+	bitflag known_true[OF_SIZE];	/* flags known to be on object */
+	bitflag known_false[OF_SIZE];	/* flags known to be missing from object */
+	bitflag ego_pval_flags_known[OF_SIZE];	/* flags known to be required in the ego */
+	ego_item_type *e_ptr;
+
+	bitflag pval_mask[OF_SIZE];
+	of_pval_mask(pval_mask);
+
+	object_flags_known(o_ptr, known_true);
+	of_copy(known_false, o_ptr->known_flags);
+	of_diff(known_false, known_true);
+
+	if (o_ptr->ego) {
+		of_copy(ego_pval_flags_known, o_ptr->ego->flags);
+		of_inter(ego_pval_flags_known, pval_mask);
+		of_inter(ego_pval_flags_known, o_ptr->known_flags);
+	}
+	else of_wipe(ego_pval_flags_known);
+
+	/* We check each ego to see whether it is a possible match for what is
+	 * known about the flags on the object, both positive and negative */
+	for_each_ego(e_ptr)
+	{
+		bitflag possible[OF_SIZE];
+		bitflag required[OF_SIZE];
+		bitflag xtra_flags[OF_SIZE];
+
+		/* restrict to egos that match the object */
+		if (ego_applies(e_ptr, o_ptr->tval, o_ptr->sval))
+		{
+			/* If a base object has a flag like slay undead you cannot differentiate the ego based upon it.
+			 * However, for flags with pvals things are clear.  */
+			if (o_ptr->ego) {
+				bitflag o_pvals_known[OF_SIZE];	/* flags in the object for which the pval is known */
+				bitflag e_pval_flags[OF_SIZE];	/* flags with pvals in e_ptr that match flags known on the object */
+				bitflag ego_pvals_visible[OF_SIZE];	/* corresponding flags with visible pvals in actual ego */
+
+				/* collect the set of flags in question */
+				object_flags_with_visible_pvals(o_ptr, o_pvals_known);
+
+				/* find matching flags in e_ptr */
+				of_copy(e_pval_flags, e_ptr->flags);
+				of_inter(e_pval_flags, o_pvals_known);
+
+				/* find matching flags in real ego */
+				of_copy(ego_pvals_visible, o_ptr->ego->flags);
+				of_inter(ego_pvals_visible, o_pvals_known);
+
+				/* check that e_ptr matches the actual ego for flags with known pvals */
+				if (!of_is_equal(e_pval_flags, ego_pvals_visible))
+					continue;
+			}
+			/* This ends checking about specific pval values. */
+
+			/* flags either from the object's kind or possible ego are required */
+			object_kind_flags(o_ptr->kind, required);
+			of_union(required, e_ptr->flags);
+
+			/* the possible flags are mainly the required flags */
+			of_copy(possible, required);
+
+			/* egos with an xtra flag increase the range of possible flags */
+			of_wipe(xtra_flags);
+			switch (e_ptr->xtra)
+			{
+				case OBJECT_XTRA_TYPE_NONE:
+					break;
+				case OBJECT_XTRA_TYPE_SUSTAIN:
+					create_mask(xtra_flags, FALSE, OFT_SUST, OFT_MAX);
+					break;
+				case OBJECT_XTRA_TYPE_RESIST:
+					create_mask(xtra_flags, FALSE, OFT_HRES, OFT_MAX);
+					break;
+				case OBJECT_XTRA_TYPE_POWER:
+					create_mask(xtra_flags, FALSE, OFT_MISC, OFT_PROT, OFT_MAX);
+					break;
+				default:
+					assert(0);
+			}
+			of_union(possible, xtra_flags);
+
+			/* check consistency of object knowledge with flags possible and required */
+			if (!of_is_subset(possible, known_true)) continue;
+			if (of_is_inter(known_false, required)) continue;
+
+			if (SENSING_REVEALS_FLAG_COUNT && object_was_sensed(o_ptr)) {
+				/*
+				 * Given the flag count, we can limit to egos producing the same number of flags as the object has.
+				 * This section of code is only about the true number of flags matching the ego.
+				 * There is no need for any reference to what is known.
+				 * However, sensing is only about learnable flags.  Stuff like HIDE_TYPE should not be counted.
+				 */
+
+				int num_eflags;	/* number of flags present in possible ego, including inherited from kind */
+				int num_oflags; /* ditto for object */
+				bitflag e_flags[OF_SIZE];	/* flags in ego, including inherited from kind */
+				bitflag o_flags[OF_SIZE];	/* ditto for object */
+
+				/* get the number of learnable flags in the object */
+				object_flags(o_ptr, o_flags);
+				num_oflags = num_learnable_flags(o_flags);
+
+				/* get the number of learnable flags for ego in question applied to same kind */
+				object_kind_flags(o_ptr->kind, e_flags);
+				of_union(e_flags, e_ptr->flags);
+				num_eflags = num_learnable_flags(e_flags);
+				if (e_ptr->xtra)
+					/* Currently all xtra powers are a single flag guaranteed to be different from given ego and kind properties */
+					num_eflags++;
+
+				if (num_oflags != num_eflags) continue;
+			}
+			num++;
+		}
+	}
+	if ((num == 0) && (o_ptr->ego))
+		/*
+		 * We could assert that some ego must match, but in case of an old savefile
+		 * that does not quite match, the ident code just reveals the ego in such cases.
+		 * This message is so that perhaps someone will make a bug report.
+		 */
+		msgt(MSG_GENERIC, "Bug: object's ego seems impossible.");
+
+	return num;
+}
+
+
+/**
+ * \returns the number of flavors that match current knowledge of object
+ */
+static int num_matching_unaware_flavors(const object_type *o_ptr)
+{
+	int num = 0;
+	bitflag known_true[OF_SIZE];	/* flags known to be in the object */
+	bitflag known_false[OF_SIZE];	/* flags known not to be in the object */
+	object_kind *k_ptr;
+
+	object_flags_known(o_ptr, known_true);
+	of_copy(known_false, o_ptr->known_flags);
+	of_diff(known_false, known_true);
+
+	/* simply check each kind to see if it allocatable and matches knowledge */
+	for_each_kind(k_ptr) {
+		bitflag k_flags[OF_SIZE];
+		
+		if (k_ptr->aware) continue;
+		if (k_ptr->tval != o_ptr->tval) continue;
+		if (!k_ptr->alloc_prob) continue;
+
+		object_kind_flags(k_ptr, k_flags);
+		if (!of_is_subset(k_flags, known_true)) continue;
+
+		if (of_is_inter(known_false, k_flags)) continue;
+		if (o_ptr->kind->effect && !k_ptr->effect) continue;
+		if (!o_ptr->kind->effect && k_ptr->effect) continue;
+	
+		num++;
+	}
+	if ((num == 0) && (!o_ptr->artifact))
+		msgt(MSG_GENERIC, "Bug: object's flavor seems impossible.");
+	return num;
+}
+
+/**
+ * \returns whether all plusses are known on an object
+ *
+ * plusses are values not associated to flags, such as to_h and to_d and to_a, 
+ */
+bool object_all_plusses_are_visible(const object_type *o_ptr)
+{
+	return object_attack_plusses_are_visible(o_ptr) && object_defence_plusses_are_visible(o_ptr) ? TRUE : FALSE;
+}
+
+
 /*
  * Checks for additional knowledge implied by what the player already knows.
  *
@@ -284,44 +768,160 @@ static bool object_add_ident_flags(object_type *o_ptr, u32b flags)
  */
 bool object_check_for_ident(object_type *o_ptr)
 {
-	bitflag flags[OF_SIZE], known_flags[OF_SIZE], f2[OF_SIZE];
-	
-	object_flags(o_ptr, flags);
+	bitflag o_flags[OF_SIZE], k_flags[OF_SIZE], known_flags[OF_SIZE], unlearnable[OF_SIZE];
+	bitflag o_flags_learnable[OF_SIZE], known_flags_learnable[OF_SIZE];
+	int i;
+
+	bool something_sensed;	/* whether you have learned any information about flags being on the object */
+
+	/* 
+	 * This next variable describes whether any flag was learned to be present on the object.
+	 * This does not inlcude flags known to be present in the kind, such as OF_TUNNEL on a digger
+	 * It does include flags on unaware jewelry.
+	 */	
+	bool some_flag_known;
+
+	assert(o_ptr->kind);
+	assert(o_ptr->kind->base);
+
+	if (object_is_known(o_ptr))
+		return FALSE;
+
+	/*
+	 * Objects such as wands could be checked for flags such as IGNORE_ELEC,
+	 * but for now this function is only about learning about wieldable items and ammo
+	 */
+	if (!obj_can_wear(o_ptr) && !object_can_be_sensed(o_ptr))
+		return FALSE;
+
+	if (SENSING_REVEALS_FLAG_COUNT && object_was_sensed(o_ptr)) {
+		/* if you know there are no flags left to learn, know all flags */
+		if (object_num_unlearned_flags(o_ptr) == 0)
+			of_setall(o_ptr->known_flags);
+	}
+
+	object_flags(o_ptr, o_flags);
 	object_flags_known(o_ptr, known_flags);
+	object_kind_flags(o_ptr->kind, k_flags);
 
-	/* Some flags are irrelevant or never learned or too hard to learn */
-	create_mask(f2, FALSE, OFT_INT, OFT_IGNORE, OFT_HATES, OFT_MAX);
+	/* first determine if we know anything about the object's flags */
+	if (object_is_jewelry(o_ptr))
+		/* jewelry learning is about learning kind flags */
+		some_flag_known = object_has_known_effect(o_ptr) || !of_is_subset(o_ptr->kind->base->flags, known_flags);
+	else
+		/* non-jewelry kinds are known, learning is about further flags */
+		some_flag_known = object_has_known_effect(o_ptr) || !of_is_subset(k_flags, known_flags);
 
-	of_diff(flags, f2);
-	of_diff(known_flags, f2);
+	something_sensed = some_flag_known || object_was_sensed(o_ptr);
 
-	if (!of_is_equal(flags, known_flags)) return FALSE;
+	/*
+	 * If nothing is known about flags, give up, unless the item might have magical plusses only.
+	 * An object with no possible ego or artifact can continue.
+	 * E.g. a wielded digger with no digging bonus is known neither ego nor artifact, so might still ID.
+	 */
+	if (!something_sensed && !object_is_jewelry(o_ptr) &&
+	    ((num_matching_egos(o_ptr) != 0) || !object_is_known_not_artifact(o_ptr)))
+		return FALSE;
 
-	/* If we know attack bonuses, and defence bonuses, and effect, then
-	 * we effectively know everything, so mark as such */
-	if ((object_attack_plusses_are_visible(o_ptr) || (object_was_sensed(o_ptr) && o_ptr->to_h == 0 && o_ptr->to_d == 0)) &&
-	    (object_defence_plusses_are_visible(o_ptr) || (object_was_sensed(o_ptr) && o_ptr->to_a == 0)) &&
-	    (object_effect_is_known(o_ptr) || !object_effect(o_ptr)))
-	{
-		/* In addition to knowing the pval flags, it is necessary to know the pvals to know everything */
-		int i;
-		for (i = 0; i < o_ptr->num_pvals; i++)
-			if (!object_this_pval_is_visible(o_ptr, i))
-				break;
-		if (i == o_ptr->num_pvals) {
+	/*
+	 * See if there is a unique match, flavor or ego, to the object in question.
+	 * Then the player can be informed.
+	 *
+	 * The following tests for <= 1 rather than == 1 give some hope to recover if
+	 * there are bugs or an object comes from an earlier version and the
+	 * rarity has been changed to 0.
+	 */
+
+	/* unique jewelry flavor */
+	if (!o_ptr->artifact && object_is_jewelry(o_ptr) &&
+	    !object_flavor_is_aware(o_ptr) &&
+	    (num_matching_unaware_flavors(o_ptr) <= 1)) {
+		object_flavor_aware(o_ptr);
+
+		/* noticing the flavor may mean more flags known */
+		object_flags_known(o_ptr, known_flags);
+	}
+
+
+	/* unique ego, or no possible ego */
+	else if (!object_is_jewelry(o_ptr) && !o_ptr->artifact && !object_ego_is_visible(o_ptr)) {
+		int num = num_matching_egos(o_ptr);
+		if (num == 0) {
+			if (o_ptr->ego) {
+				/* requires a bug to get here, but instead of assert failure,
+				 * might as well let the player keep playing */
+				num = 1;
+			} else {
+				/* the char knows that no ego could match */
+				object_notice_ego(o_ptr);
+				if (object_all_plusses_are_visible(o_ptr)) {
+					object_notice_everything(o_ptr);
+					return TRUE;
+				}
+				else
+					return FALSE;
+			}
+		}
+		if (num == 1) { /* not an else-if, see num=1 above */
+			/* it is possible for num of 1 with no ego e.g. boring gloves match ego of slaying */
+			if (o_ptr->ego) {
+				object_notice_ego(o_ptr);
+				/* object_notice_ego recursively calls back to object_check_for_ident
+				 * so the recursion already did all ident work possible.  */
+				return o_ptr->ident & IDENT_KNOWN ? TRUE : FALSE;
+
+				/* If the recursion is ever removed from object_notice_ego, uncomment the next line */
+				/* noticing the ego may mean more flags known 
+				object_flags_known(o_ptr, known_flags);
+				*/
+			}
+		}
+
+	}
+
+	/* ID is not finished if you do not know the activation */
+	if (object_effect(o_ptr) && !object_effect_is_known(o_ptr))
+		return FALSE;
+
+	of_copy(o_flags_learnable, o_flags);
+	of_copy(known_flags_learnable, known_flags);
+
+	/* only interested in what's over and above flags inherited from kind */
+	if (object_flavor_is_aware(o_ptr)) {
+ 		bitflag k_flags[OF_SIZE];
+		object_kind_flags(o_ptr->kind, k_flags);
+
+		of_diff(o_flags_learnable, k_flags);
+		of_diff(known_flags_learnable, k_flags);
+	}
+
+	/* We need to deal with flags that cannot be learned */
+	of_unlearnable_mask(unlearnable);
+	of_diff(o_flags_learnable, unlearnable);
+	of_diff(known_flags_learnable, unlearnable);
+
+
+	/* require full knowledge, positive and negative, of all learnable flags */
+	if (!of_is_equal(o_flags_learnable, known_flags_learnable)) return FALSE;
+
+	/* 
+	 * In order to get this far, all knowable flags in the object must be known.
+	 * To give IDENT_KNOWN status, we also require knowing there are no other flags,
+	 * and also require knowledge of all pvals and non-flag plusses.
+	 */
+
+	/* In addition to knowing the pval flags, it is necessary to know the pvals */
+	/* EFG this should test knowledge of pvals of individual flags */
+	for (i = 0; i < o_ptr->num_pvals; i++) if (!object_this_pval_is_visible(o_ptr, i)) return FALSE;
+
+	/* require sensing to know if there are unknown flags, except if cannot sense */
+	if (object_was_sensed(o_ptr) || !object_can_be_sensed(o_ptr)) {
+		if (object_all_plusses_are_visible(o_ptr)) {
 			object_notice_everything(o_ptr);
 			return TRUE;
 		}
 	}
-
-	/* We still know all the flags, so we still know if it's an ego */
-	if (o_ptr->ego)
-	{
-		/* require worn status so you don't learn launcher of accuracy or gloves of slaying before wield */
-		if (object_was_worn(o_ptr))
-			object_notice_ego(o_ptr);
-	}
-
+ 
 	return FALSE;
 }
 
@@ -382,7 +982,7 @@ void object_know_all_flags(object_type *o_ptr)
 #define IDENTS_SET_BY_IDENTIFY ( IDENT_KNOWN | IDENT_ATTACK | IDENT_DEFENCE | IDENT_SENSE | IDENT_EFFECT | IDENT_WORN | IDENT_FIRED | IDENT_NAME )
 
 /**
- * Check whether an object has IDENT_KNOWN but should not
+ * \returns whether an object has IDENT_KNOWN but should not
  */
 bool object_is_not_known_consistently(const object_type *o_ptr)
 {
@@ -418,14 +1018,14 @@ void object_notice_everything(object_type *o_ptr)
 
 	/* Mark as known */
 	object_flavor_aware(o_ptr);
-	object_add_ident_flags(o_ptr, IDENTS_SET_BY_IDENTIFY);
+	object_notice_artifact(o_ptr);
+	object_notice_ego(o_ptr);
 
-	/* Artifact has now been seen */
-	if (o_ptr->artifact && !(o_ptr->ident & IDENT_FAKE))
-	{
-		o_ptr->artifact->seen = o_ptr->artifact->everseen = TRUE;
-		history_add_artifact(o_ptr->artifact, TRUE, TRUE);
-	}
+	/* IDENT_NAME is in the next set, but it should be set only by
+	 * object_notice_artifact or object_notice_ego for everseen purposes,
+	 * among other reasons.  What should be changed?
+	 */
+	object_add_ident_flags(o_ptr, IDENTS_SET_BY_IDENTIFY);
 
 	/* Know all flags there are to be known */
 	object_know_all_flags(o_ptr);
@@ -433,6 +1033,8 @@ void object_notice_everything(object_type *o_ptr)
 
 
 
+#if 0
+/* EFG the flag IDENT_INDESTRUCT should be eliminated */
 /**
  * Notice that an object is indestructible.
  */
@@ -440,30 +1042,33 @@ void object_notice_indestructible(object_type *o_ptr)
 {
 	if (object_add_ident_flags(o_ptr, IDENT_INDESTRUCT))
 		object_check_for_ident(o_ptr);
+	object_notice_artifact(o_ptr);
 }
+#endif
 
 
-/*
- * Notice the ego on an ego item.
+/**
+ * Notice the ego on an ego item, or that there is no ego
  */
 void object_notice_ego(object_type *o_ptr)
 {
 	bitflag learned_flags[OF_SIZE];
 	bitflag xtra_flags[OF_SIZE];
 
-	if (!o_ptr->ego)
+	/* Things are a bit confused because lights can be egos, but can also be jewelry e.g. The Phial */
+	/* This function might be called on a light, which might be jewelry, leading to bugs elsewhere. */
+	if (object_is_jewelry(o_ptr)) return;
+
+	if (!object_add_ident_flags(o_ptr, IDENT_NAME)) return;
+
+	/* all flags are known when an object is known neither ego nor artifact */
+	if (!o_ptr->ego && object_is_known_not_artifact(o_ptr)) {
+		of_setall(o_ptr->known_flags);
 		return;
-
-
-	/* XXX Eddie print a message on notice ego if not already noticed? */
-	/* XXX Eddie should we do something about everseen of egos here? */
-
-	/* Learn ego flags */
-	of_union(o_ptr->known_flags, o_ptr->ego->flags);
+	}
 
 	/* Learn all flags except random abilities */
 	of_setall(learned_flags);
-
 	switch (o_ptr->ego->xtra)
 	{
 		case OBJECT_XTRA_TYPE_NONE:
@@ -483,47 +1088,64 @@ void object_notice_ego(object_type *o_ptr)
 		default:
 			assert(0);
 	}
-
 	of_union(o_ptr->known_flags, learned_flags);
 
-	if (object_add_ident_flags(o_ptr, IDENT_NAME))
-	{
-		/* if you know the ego, you know which it is of excellent or splendid */
-		object_notice_sensing(o_ptr);
+	/*
+	 * Learn ego flags, which is not redundant in the case where an ego is 
+	 * allowed with a guaranteed flag that matches the xtra possibilities.
+	 * E.g. gondolin ego has guaranteed flags matching xtra_flags.
+	 */
+	of_union(o_ptr->known_flags, o_ptr->ego->flags);
 
-		object_check_for_ident(o_ptr);
-	}
+	object_check_for_ident(o_ptr);
 }
 
 
-/*
+/**
  * Mark an object as sensed.
+ *
+ * This now means that the char knows the number of flags on the item,
+ * so it is premature to notice sensing just because you know the item
+ * is splendid or an artifact.
  */
 void object_notice_sensing(object_type *o_ptr)
 {
-	if (object_was_sensed(o_ptr))
-		return;
+	if (!object_add_ident_flags(o_ptr, IDENT_SENSE)) return;
 
-	if (o_ptr->artifact) {
-		o_ptr->artifact->seen = o_ptr->artifact->everseen = TRUE;
-		o_ptr->ident |= IDENT_NAME;
-	}
+	object_notice_artifact(o_ptr);
 
 	object_notice_curses(o_ptr);
-	if (object_add_ident_flags(o_ptr, IDENT_SENSE))
-		object_check_for_ident(o_ptr);
+
+	/* note lack of name for boring objects */
+	if (object_is_not_excellent(o_ptr))
+		object_notice_ego(o_ptr);
+
+	object_check_for_ident(o_ptr);
 }
 
 
-/*
- * Sense artifacts
+/**
+ * Notice whether object is an artifact
  */
-void object_sense_artifact(object_type *o_ptr)
+void object_notice_artifact(object_type *o_ptr)
 {
-	if (o_ptr->artifact)
-		object_notice_sensing(o_ptr);
-	else
-		o_ptr->ident |= IDENT_NOTART;
+	if (!object_add_ident_flags(o_ptr, IDENT_NOTICE_ART)) return;
+
+	if (o_ptr->artifact) {
+		/* Show the artifact name so you get the correct description. */
+		object_add_ident_flags(o_ptr, IDENT_NAME);
+		/* no need to show flavor when name is known */
+		object_flavor_aware(o_ptr);
+
+		if (!(o_ptr->ident & IDENT_FAKE)) {
+			/* mark seen status */
+			o_ptr->artifact->seen = TRUE;
+			o_ptr->artifact->everseen = TRUE;
+
+			/* Note artifacts when found */
+			history_add_artifact(o_ptr->artifact, object_is_known(o_ptr), TRUE);
+		}
+	}
 }
 
 
@@ -534,12 +1156,13 @@ void object_sense_artifact(object_type *o_ptr)
  */
 void object_notice_effect(object_type *o_ptr)
 {
-	if (object_add_ident_flags(o_ptr, IDENT_EFFECT))
-		object_check_for_ident(o_ptr);
+	if (!object_add_ident_flags(o_ptr, IDENT_EFFECT)) return;
 
 	/* noticing an effect gains awareness */
 	if (!object_flavor_is_aware(o_ptr))
 		object_flavor_aware(o_ptr);
+
+	object_check_for_ident(o_ptr);
 }
 
 
@@ -547,11 +1170,9 @@ static void object_notice_defence_plusses(struct player *p, object_type *o_ptr)
 {
 	assert(o_ptr && o_ptr->kind);
 
-	if (object_defence_plusses_are_visible(o_ptr))
-		return;
+	if (!object_add_ident_flags(o_ptr, IDENT_DEFENCE)) return;
 
-	if (object_add_ident_flags(o_ptr, IDENT_DEFENCE))
-		object_check_for_ident(o_ptr);
+	object_check_for_ident(o_ptr);
 
 	if (o_ptr->ac || o_ptr->to_a)
 	{
@@ -573,11 +1194,9 @@ void object_notice_attack_plusses(object_type *o_ptr)
 {
 	assert(o_ptr && o_ptr->kind);
 
-	if (object_attack_plusses_are_visible(o_ptr))
-		return;
+	if (!object_add_ident_flags(o_ptr, IDENT_ATTACK)) return;
 
-	if (object_add_ident_flags(o_ptr, IDENT_ATTACK))
-		object_check_for_ident(o_ptr);
+	object_check_for_ident(o_ptr);
 
 
 	if (wield_slot(o_ptr) == INVEN_WIELD)
@@ -604,17 +1223,25 @@ void object_notice_attack_plusses(object_type *o_ptr)
 }
 
 
-/*
- * Notice a single flag - returns TRUE if anything new was learned
+/**
+ * Notice a single flag
+ *
+ * \returns whether anything new was learned
  */
-bool object_notice_flag(object_type *o_ptr, int flag)
+bool object_notice_flag(object_type *o_ptr, flag_type flag)
 {
 	if (!of_has(o_ptr->known_flags, flag))
 	{
+		/* message for noticing presence of flag */
+		bitflag o_flags[OF_SIZE];
+		object_flags(o_ptr, o_flags);
+		if (of_has(o_flags, flag)) {
+			char o_name[80];
+			object_desc(o_name, sizeof(o_name), o_ptr, ODESC_BASE);
+			flag_message(flag, o_name);
+		}
+
 		of_on(o_ptr->known_flags, flag);
-		/* XXX Eddie don't want infinite recursion if object_check_for_ident sets more flags,
-		 * but maybe this will interfere with savefile repair
-		 */
 		object_check_for_ident(o_ptr);
 		event_signal(EVENT_INVENTORY);
 		event_signal(EVENT_EQUIPMENT);
@@ -626,17 +1253,16 @@ bool object_notice_flag(object_type *o_ptr, int flag)
 }
 
 
-/*
- * Notice a set of flags - returns TRUE if anything new was learned
+/**
+ * Notice a set of flags
+ *
+ * \returns whether anything new was learned
  */
 bool object_notice_flags(object_type *o_ptr, bitflag flags[OF_SIZE])
 {
 	if (!of_is_subset(o_ptr->known_flags, flags))
 	{
 		of_union(o_ptr->known_flags, flags);
-		/* XXX Eddie don't want infinite recursion if object_check_for_ident sets more flags,
-		 * but maybe this will interfere with savefile repair
-		 */
 		object_check_for_ident(o_ptr);
 		event_signal(EVENT_INVENTORY);
 		event_signal(EVENT_EQUIPMENT);
@@ -652,27 +1278,24 @@ bool object_notice_flags(object_type *o_ptr, bitflag flags[OF_SIZE])
  * Notice curses on an object.
  *
  * \param o_ptr is the object to notice curses on
+ *
+ * \returns whether the object is cursed
  */
 bool object_notice_curses(object_type *o_ptr)
 {
-	bitflag f[OF_SIZE], f2[OF_SIZE];
+	bitflag o_flags[OF_SIZE], curse_mask[OF_SIZE];
 
-	object_flags(o_ptr, f);
-
-	/* Gather whatever curse flags there are to know */
-	create_mask(f2, FALSE, OFT_CURSE, OFT_MAX);
-
-	/* Remove everything except the curse flags */
-	of_inter(f, f2);
+	object_flags(o_ptr, o_flags);
+	of_curse_mask(curse_mask);
 
 	/* give knowledge of which curses are present */
-	object_notice_flags(o_ptr, f);
+	object_notice_flags(o_ptr, curse_mask);
 
 	object_check_for_ident(o_ptr);
 
 	p_ptr->notice |= PN_SQUELCH;
 
-	return !of_is_empty(f);
+	return of_is_inter(o_flags, curse_mask);
 }
 
 
@@ -692,11 +1315,10 @@ void object_notice_on_defend(struct player *p)
 }
 
 
-/*
+/**
  * Notice stuff when firing or throwing objects.
  *
  */
-/* XXX Eddie perhaps some stuff from do_cmd_fire and do_cmd_throw should be moved here */
 void object_notice_on_firing(object_type *o_ptr)
 {
 	if (object_add_ident_flags(o_ptr, IDENT_FIRED))
@@ -705,36 +1327,31 @@ void object_notice_on_firing(object_type *o_ptr)
 
 
 
-/*
- * Determine whether a weapon or missile weapon is obviously {excellent} when
- * worn.
- *
- * XXX Eddie should messages be adhoc all over the place?  perhaps the main
- * loop should check for change in inventory/wieldeds and all messages be
- * printed from one place
+/**
+ * Notice flags that are apparent when the object is wielded
  */
 void object_notice_on_wield(object_type *o_ptr)
 {
-	bitflag f[OF_SIZE], f2[OF_SIZE], obvious_mask[OF_SIZE];
+	bitflag o_flags[OF_SIZE], obvious_mask[OF_SIZE];
 	bool obvious = FALSE;
-
-	create_mask(obvious_mask, TRUE, OFID_WIELD, OFT_MAX);
 
 	/* Save time of wield for later */
 	object_last_wield = turn;
 
+	if (!object_add_ident_flags(o_ptr, IDENT_WORN)) {
+		/* In case of bugs, it is nice to run through the 
+		 * routine even with IDENT_WORN already set
+		return*/;
+	}
+
 	/* Only deal with un-ID'd items */
 	if (object_is_known(o_ptr)) return;
 
+	/* Automatically sense artifacts upon wield */
+	object_notice_artifact(o_ptr);
+
 	/* Wear it */
 	object_flavor_tried(o_ptr);
-	if (object_add_ident_flags(o_ptr, IDENT_WORN))
-		object_check_for_ident(o_ptr);
-
-	/* CC: may wish to be more subtle about this once we have ego lights
-	 * with multiple pvals */
-	if (obj_is_light(o_ptr) && o_ptr->ego)
-		object_notice_ego(o_ptr);
 
 	if (object_flavor_is_aware(o_ptr) && easy_know(o_ptr))
 	{
@@ -742,25 +1359,16 @@ void object_notice_on_wield(object_type *o_ptr)
 		return;
 	}
 
-	/* Automatically sense artifacts upon wield */
-	object_sense_artifact(o_ptr);
-
-	/* Note artifacts when found */
-	if (o_ptr->artifact)
-		history_add_artifact(o_ptr->artifact, object_is_known(o_ptr), TRUE);
-
-	/* special case FA, needed at least for mages wielding gloves */
-	if (object_FA_would_be_obvious(o_ptr))
-		of_on(obvious_mask, OF_FREE_ACT);
+	object_check_for_ident(o_ptr);
 
 	/* Extract the flags */
-	object_flags(o_ptr, f);
+	object_flags(o_ptr, o_flags);
 
-	/* Find obvious things (disregarding curses) - why do we remove the curses?? */
-	create_mask(f2, FALSE, OFT_CURSE, OFT_MAX);
-	of_diff(obvious_mask, f2);
-	if (of_is_inter(f, obvious_mask)) obvious = TRUE;
-	create_mask(obvious_mask, TRUE, OFID_WIELD, OFT_MAX);
+	kind_obvious_mask(o_ptr->kind, obvious_mask);
+
+	/* ability to be activated is obvious, but there is no flag for it any more */
+	if (of_is_inter(o_flags, obvious_mask) || object_effect(o_ptr))
+		obvious = TRUE;
 
 	/* Notice any obvious brands or slays */
 	object_notice_slays(o_ptr, obvious_mask);
@@ -768,71 +1376,52 @@ void object_notice_on_wield(object_type *o_ptr)
 	/* Learn about obvious flags */
 	of_union(o_ptr->known_flags, obvious_mask);
 
-	/* XXX Eddie should these next NOT call object_check_for_ident due to worries about repairing? */
-
-	/* XXX Eddie this is a small hack, but jewelry with anything noticeable really is obvious */
-	/* XXX Eddie learn =soulkeeping vs =bodykeeping when notice sustain_str */
-	if (object_is_jewelry(o_ptr))
-	{
-		/* Learn the flavor of jewelry with obvious flags */
-		if (EASY_LEARN && obvious)
-			object_flavor_aware(o_ptr);
-
-		/* Learn all flags on any aware non-artifact jewelry */
-		if (object_flavor_is_aware(o_ptr) && !o_ptr->artifact)
-			object_know_all_flags(o_ptr);
-	}
-
 	object_check_for_ident(o_ptr);
 
 	if (!obvious) return;
 
-	/* XXX Eddie need to add stealth here, also need to assert/double-check everything is covered */
+	/* EFG need to add stealth here, also need to assert/double-check everything is covered */
 	/* CC: also need to add FA! */
-	if (of_has(f, OF_STR))
+	if (of_has(o_flags, OF_STR))
 		msg("You feel %s!", o_ptr->pval[which_pval(o_ptr,
 			OF_STR)] > 0 ? "stronger" : "weaker");
-	if (of_has(f, OF_INT))
+	if (of_has(o_flags, OF_INT))
 		msg("You feel %s!", o_ptr->pval[which_pval(o_ptr,
 			OF_INT)] > 0 ? "smarter" : "more stupid");
-	if (of_has(f, OF_WIS))
+	if (of_has(o_flags, OF_WIS))
 		msg("You feel %s!", o_ptr->pval[which_pval(o_ptr,
 			OF_WIS)] > 0 ? "wiser" : "more naive");
-	if (of_has(f, OF_DEX))
+	if (of_has(o_flags, OF_DEX))
 		msg("You feel %s!", o_ptr->pval[which_pval(o_ptr,
 			OF_DEX)] > 0 ? "more dextrous" : "clumsier");
-	if (of_has(f, OF_CON))
+	if (of_has(o_flags, OF_CON))
 		msg("You feel %s!", o_ptr->pval[which_pval(o_ptr,
 			OF_CON)] > 0 ? "healthier" : "sicklier");
-	if (of_has(f, OF_CHR))
+	if (of_has(o_flags, OF_CHR))
 		msg("You feel %s!", o_ptr->pval[which_pval(o_ptr,
 			OF_CHR)] > 0 ? "cuter" : "uglier");
-	if (of_has(f, OF_SPEED))
+	if (of_has(o_flags, OF_SPEED))
 		msg("You feel strangely %s.", o_ptr->pval[which_pval(o_ptr,
 			OF_SPEED)] > 0 ? "quick" : "sluggish");
-	if (of_has(f, OF_BLOWS))
+	if (of_has(o_flags, OF_BLOWS))
 		msg("Your weapon %s in your hands.",
 			o_ptr->pval[which_pval(o_ptr, OF_BLOWS)] > 0 ?
 				"tingles" : "aches");
-	if (of_has(f, OF_SHOTS))
+	if (of_has(o_flags, OF_SHOTS))
 		msg("Your bow %s in your hands.",
 			o_ptr->pval[which_pval(o_ptr, OF_SHOTS)] > 0 ?
 				"tingles" : "aches");
-	if (of_has(f, OF_INFRA))
+	if (of_has(o_flags, OF_INFRA))
 		msg("Your eyes tingle.");
-	if (of_has(f, OF_LIGHT))
+	if (of_has(o_flags, OF_LIGHT))
 		msg("It glows!");
-	if (of_has(f, OF_TELEPATHY))
+	if (of_has(o_flags, OF_TELEPATHY))
 		msg("Your mind feels strangely sharper!");
 
-	/* WARNING -- masking f by obvious mask -- this should be at the end of this function */
-	/* CC: I think this can safely go, but just in case ... */
-/*	flags_mask(f, OF_SIZE, OF_OBVIOUS_MASK, FLAG_END); */
+	/* this used to be a flag, still counts as the same idea */
+	if (object_effect(o_ptr) && !object_effect_is_known(o_ptr))
+		msg("You have something to activate.");
 
-	/* Remember the flags */
-	object_notice_sensing(o_ptr);
-
-	/* XXX Eddie should we check_for_ident here? */
 }
 
 
@@ -842,54 +1431,27 @@ void object_notice_on_wield(object_type *o_ptr)
 static void object_notice_after_time(void)
 {
 	int i;
-	int flag;
+	flag_type flag;
 
 	object_type *o_ptr;
-	char o_name[80];
 
-	bitflag f[OF_SIZE], timed_mask[OF_SIZE];
+	bitflag timed_mask[OF_SIZE];
 
 	create_mask(timed_mask, TRUE, OFID_TIMED, OFT_MAX);
 
 	/* Check every item the player is wearing */
-	for (i = INVEN_WIELD; i < ALL_INVEN_TOTAL; i++)
+	for (i = INVEN_WIELD; i < INVEN_TOTAL; i++)
 	{
 		o_ptr = &p_ptr->inventory[i];
 
 		if (!o_ptr->kind || object_is_known(o_ptr)) continue;
 
-		/* Check for timed notice flags */
-		object_desc(o_name, sizeof(o_name), o_ptr, ODESC_BASE);
-		object_flags(o_ptr, f);
-		of_inter(f, timed_mask);
-
-		for (flag = of_next(f, FLAG_START); flag != FLAG_END; flag = of_next(f, flag + 1))
+		for (flag = of_next(timed_mask, FLAG_START); flag != FLAG_END; flag = of_next(timed_mask, flag + 1))
 		{
-			if (!of_has(o_ptr->known_flags, flag))
-			{
-				/* Message */
-				flag_message(flag, o_name);
-
-				/* Notice the flag */
-				object_notice_flag(o_ptr, flag);
-
-				if (object_is_jewelry(o_ptr) &&
-					 (!object_effect(o_ptr) || object_effect_is_known(o_ptr)))
-				{
-					/* XXX this is a small hack, but jewelry with anything noticeable really is obvious */
-					/* XXX except, wait until learn activation if that is only clue */
-					object_flavor_aware(o_ptr);
-					object_check_for_ident(o_ptr);
-				}
-			}
-			else
-			{
-				/* Notice the flag is absent */
-				object_notice_flag(o_ptr, flag);
-			}
+			/* Learn the flag */
+			object_notice_flag(o_ptr, flag);
 		}
 
-		/* XXX Is this necessary? */
 		object_check_for_ident(o_ptr);
 	}
 }
@@ -900,51 +1462,18 @@ static void object_notice_after_time(void)
  *
  * \param flag is the flag to notice
  */
-void wieldeds_notice_flag(struct player *p, int flag)
+void wieldeds_notice_flag(struct player *p, flag_type flag)
 {
 	int i;
 
 	/* Sanity check */
 	if (!flag) return;
 
-	/* XXX Eddie need different naming conventions for starting wieldeds at INVEN_WIELD vs INVEN_WIELD+2 */
-	for (i = INVEN_WIELD; i < ALL_INVEN_TOTAL; i++)
+	for (i = INVEN_WIELD; i < INVEN_TOTAL; i++)
 	{
 		object_type *o_ptr = &p->inventory[i];
-		bitflag f[OF_SIZE];
-
 		if (!o_ptr->kind) continue;
-
-		object_flags(o_ptr, f);
-
-		if (of_has(f, flag) && !of_has(o_ptr->known_flags, flag))
-		{
-			char o_name[80];
-			object_desc(o_name, sizeof(o_name), o_ptr, ODESC_BASE);
-
-			/* Notice the flag */
-			object_notice_flag(o_ptr, flag);
-
-			/* XXX Eddie should this go before noticing the flag to avoid learning twice? */
-			if (EASY_LEARN && object_is_jewelry(o_ptr))
-			{
-				/* XXX Eddie EASY_LEARN Possible concern: gets =teleportation just from +2 speed */
-				object_flavor_aware(o_ptr);
-				object_check_for_ident(o_ptr);
-			}
-
-			/* Message */
-			flag_message(flag, o_name);
-		}
-		else
-		{
-			/* Notice that flag is absent */
-			object_notice_flag(o_ptr, flag);
-		}
-
-		/* XXX Eddie should not need this, should be done in noticing, but will remove later */
-		object_check_for_ident(o_ptr);
-
+		object_notice_flag(o_ptr, flag);
 	}
 
 	return;
@@ -952,10 +1481,10 @@ void wieldeds_notice_flag(struct player *p, int flag)
 
 
 /**
- * Notice things which happen on attacking.
+ * Notice attack plusses from offweapon slots.
+ * Does not apply to melee weapon or bow.
  */
-void wieldeds_notice_on_attack(void)
-/* Does not apply to weapon or bow which should be done separately */
+void wieldeds_notice_offweapon_attack_plusses(void)
 {
 	int i;
 
@@ -963,25 +1492,9 @@ void wieldeds_notice_on_attack(void)
 		if (p_ptr->inventory[i].kind)
 			object_notice_attack_plusses(&p_ptr->inventory[i]);
 
-	/* XXX Eddie print message? */
-	/* XXX Eddie do we need to do more about ammo? */
-
 	return;
 }
 
-
-bool object_FA_would_be_obvious(const object_type *o_ptr)
-{
-	if (player_has(PF_CUMBER_GLOVE) && wield_slot(o_ptr) == INVEN_HANDS) {
-		bitflag flags[OF_SIZE];
-		object_flags(o_ptr, flags);
-
-		if (!of_has(flags, OF_DEX) && !of_has(flags, OF_SPELLS_OK))
-			return TRUE;
-	}
-
-	return FALSE;
-}
 
 /*
  * Given an object, return a short identifier which gives some idea of what
@@ -989,39 +1502,14 @@ bool object_FA_would_be_obvious(const object_type *o_ptr)
  */
 obj_pseudo_t object_pseudo(const object_type *o_ptr)
 {
-	bitflag flags[OF_SIZE], f2[OF_SIZE];
-
-	/* Get the known and obvious flags on the object,
-	 * not including curses or properties of the kind.
-	 */
-	object_flags_known(o_ptr, flags);
-	create_mask(f2, TRUE, OFID_WIELD, OFT_MAX);
-
-	/* FA on gloves is obvious to mage casters */
-	if (object_FA_would_be_obvious(o_ptr))
-		of_on(f2, OF_FREE_ACT);
-
-	/* Now we remove the non-obvious known flags */
-	of_inter(flags, f2);
-
-	/* Now we remove the cursed flags and the kind flags */
-	create_mask(f2, FALSE, OFT_CURSE, OFT_MAX);
-	of_diff(flags, f2);
-	of_diff(flags, o_ptr->kind->flags);
-
-	if (o_ptr->ident & IDENT_INDESTRUCT)
-		return INSCRIP_SPECIAL;
-	if ((object_was_sensed(o_ptr) || object_was_worn(o_ptr)) && o_ptr->artifact)
+	if (object_is_known_artifact(o_ptr))
 		return INSCRIP_SPECIAL;
 
 	/* jewelry does not pseudo */
 	if (object_is_jewelry(o_ptr))
 		return INSCRIP_NULL;
 
-	/* XXX Eddie should also check for flags with pvals where the pval exceeds
-	 * the base pval for things like picks of digging, though for now acid brand gets those
-	 */
-	if (!of_is_empty(flags))
+	if (object_is_known_splendid(o_ptr))
 		return INSCRIP_SPLENDID;
 
 	if (!object_is_known(o_ptr) && !object_was_sensed(o_ptr))
@@ -1029,9 +1517,12 @@ obj_pseudo_t object_pseudo(const object_type *o_ptr)
 
 	if (o_ptr->ego)
 	{
+		bitflag curse_mask[OF_SIZE];
+		of_curse_mask(curse_mask);
+
 		/* uncursed bad egos are not excellent */
-		if (of_is_inter(o_ptr->ego->flags, f2))
-			return INSCRIP_STRANGE; /* XXX Eddie need something worse */
+		if (of_is_inter(o_ptr->ego->flags, curse_mask))
+			return INSCRIP_STRANGE;
 		else
 			return INSCRIP_EXCELLENT;
 	}

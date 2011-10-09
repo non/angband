@@ -324,11 +324,7 @@ static void py_pickup_aux(int o_idx, bool domsg)
 	p_ptr->notice |= PN_SQUELCH;
 
 	/* Automatically sense artifacts */
-	object_sense_artifact(o_ptr);
-
-	/* Log artifacts if found */
-	if (o_ptr->artifact)
-		history_add_artifact(o_ptr->artifact, object_is_known(o_ptr), TRUE);
+	object_notice_artifact(o_ptr);
 
 	/* Optionally, display a message */
 	if (domsg && !quiver_slot)

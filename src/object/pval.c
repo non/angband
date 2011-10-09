@@ -108,7 +108,8 @@ bool object_this_pval_is_visible(const object_type *o_ptr, int pval)
         object_pval_flags_known(o_ptr, f);
 
         /* Create the mask for pval-related flags */
-        create_mask(f2, FALSE, OFT_STAT, OFT_PVAL, OFT_MAX);
+		of_pval_mask(f2);
+        //create_mask(f2, FALSE, OFT_STAT, OFT_PVAL, OFT_MAX);
 
         if (of_is_inter(f[pval], f2))
             return TRUE;

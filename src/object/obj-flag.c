@@ -49,11 +49,17 @@ static const char *flag_names[] =
  *
  * N.B. OFT_MAX must be the last item in the ... list
  */
-void create_mask(bitflag *f, bool id, ...)
+void create_mask(bitflag f[OF_SIZE], bool id, ...)
 {
 	const struct object_flag *of_ptr;
 	int i;
 	va_list args;
+
+	/* a dummy first flag is assumed below, so make sure it is still there */
+	assert(OF_NONE == 0);
+
+	/* using OFT_MAX as end marker, but OFID are a separate enum */
+	assert ((int)OFID_MAX <= (int)OFT_MAX);
 
 	of_wipe(f);
 
@@ -62,14 +68,42 @@ void create_mask(bitflag *f, bool id, ...)
 	/* Process each type in the va_args */
     for (i = va_arg(args, int); i != OFT_MAX; i = va_arg(args, int)) {
 		for (of_ptr = object_flag_table; of_ptr->index < OF_MAX; of_ptr++)
-			if ((id && of_ptr->id == i) || (!id && of_ptr->type == i))
-				of_on(f, of_ptr->index);
+			if ((id && of_ptr->id == i) || (!id && of_ptr->type == i)) {
+				/* flag code crashes badly with too small flags */
+				if (of_ptr->index >= FLAG_START)
+					of_on(f, of_ptr->index);
+			}
 	}
 
 	va_end(args);
 
 	return;
 }
+
+/**
+ * Create the mask of unlearnable flags.
+ */
+void of_unlearnable_mask(bitflag unlearnable[OF_SIZE])
+{
+	create_mask(unlearnable, TRUE, OFID_NONE, OFT_MAX);
+}
+
+/**
+ * Create the mask of curse flags.
+ */
+void of_curse_mask(bitflag curse_mask[OF_SIZE])
+{
+	create_mask(curse_mask, FALSE, OFT_CURSE, OFT_MAX);
+}
+
+/**
+ * Create the mask of pval flags.
+ */
+void of_pval_mask(bitflag pval_mask[OF_SIZE])
+{
+	create_mask(pval_mask, FALSE, OFT_PVAL, OFT_STAT, OFT_MAX);
+}
+
 
 /**
  * Print a message when an object flag is identified by use.

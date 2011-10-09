@@ -293,6 +293,58 @@ void reset_visuals(bool load_prefs)
 }
 
 
+/**
+ * \returns whether an object is of a type that can be pseudoed
+ */
+bool object_can_be_sensed(const object_type *o_ptr)
+{
+	if (!obj_can_wear(o_ptr)) return FALSE;
+		
+	return !(object_is_jewelry(o_ptr) || obj_is_light(o_ptr)) ? TRUE : FALSE;
+}
+
+/**
+ * \returns whether wieldable object is only offensive without ego
+ */
+bool object_base_only_offensive(const object_type *o_ptr)
+{
+	if (obj_is_ammo(o_ptr)) return TRUE;
+	switch(wield_slot(o_ptr)) {
+		case INVEN_WIELD:
+		case INVEN_BOW:
+			return TRUE;
+		default:
+			return FALSE;
+	}
+}
+
+
+/**
+ * \returns whether wieldable object is only defensive without ego
+ */
+bool object_base_only_defensive(const object_type *o_ptr)
+{
+	if (obj_is_ammo(o_ptr)) return FALSE;
+	if (wield_slot(o_ptr) > INVEN_LIGHT)
+		return TRUE;
+	else
+		return FALSE;
+}
+
+
+/**
+ * Obtain the "flags" for an item
+ */
+void object_kind_flags(const object_kind *kind, bitflag flags[OF_SIZE])
+{
+	of_wipe(flags);
+	if (kind) {
+		of_union(flags, kind->base->flags);
+		of_union(flags, kind->flags);
+	}
+}
+
+
 /*
  * Obtain the flags for an item
  */
@@ -312,10 +364,23 @@ void object_flags(const object_type *o_ptr, bitflag flags[OF_SIZE])
  */
 void object_flags_known(const object_type *o_ptr, bitflag flags[OF_SIZE])
 {
+
 	object_flags(o_ptr, flags);
 
 	of_inter(flags, o_ptr->known_flags);
 
+	if (object_is_known_artifact(o_ptr)) {
+		/* all artifacts have all ignores */
+		bitflag f2[OF_SIZE];
+		create_mask(f2, FALSE, OFT_IGNORE, OFT_MAX);
+
+		/* sanity check */
+		of_inter(f2, o_ptr->artifact->flags);
+
+		of_union(flags, f2);
+	}
+
+	of_union(flags, o_ptr->kind->base->flags);
 	if (object_flavor_is_aware(o_ptr))
 		of_union(flags, o_ptr->kind->flags);
 
@@ -463,6 +528,12 @@ s16b wield_slot_ammo(const object_type *o_ptr)
 	return open ? open : QUIVER_START;
 }
 
+s16b wield_slot(const object_type *o_ptr)
+{
+	/* ammo requires special casing due to current quiver implementation */
+	if (obj_is_ammo(o_ptr)) return wield_slot_ammo(o_ptr);
+	else return base_wield_slot(o_ptr->kind->base);
+}
 /**
  * Determine which equipment slot (if any) an item likes. The slot might (or
  * might not) be open, but it is a slot which the object could be equipped in.
@@ -471,10 +542,10 @@ s16b wield_slot_ammo(const object_type *o_ptr)
  * will try to a return a stackable slot first (only for ammo), then an open
  * slot if possible, and finally a used (but valid) slot if necessary.
  */
-s16b wield_slot(const object_type *o_ptr)
+s16b base_wield_slot(const object_base *base)
 {
 	/* Slot for equipment */
-	switch (o_ptr->tval)
+	switch (base->tval)
 	{
 		case TV_DIGGING:
 		case TV_HAFTED:
@@ -505,9 +576,10 @@ s16b wield_slot(const object_type *o_ptr)
 
 		case TV_BOOTS: return (INVEN_FEET);
 
+		/* ammo requires an object, not just a base */
 		case TV_BOLT:
 		case TV_ARROW:
-		case TV_SHOT: return wield_slot_ammo(o_ptr);
+		case TV_SHOT: assert(0);
 	}
 
 	/* No slot available */
@@ -918,7 +990,7 @@ void delete_object(int y, int x)
 		next_o_idx = o_ptr->next_o_idx;
 
 		/* Preserve unseen artifacts */
-		if (o_ptr->artifact && !object_was_sensed(o_ptr))
+		if (o_ptr->artifact && !object_name_is_visible(o_ptr))
 			o_ptr->artifact->created = FALSE;
 
 		/* Delete the mimicking monster if necessary */
@@ -1214,8 +1286,7 @@ void wipe_o_list(struct cave *c)
 		if (o_ptr->artifact) {
 			/* Preserve if dungeon creation failed, or preserve mode, or items
 			 * carried by monsters, and only artifacts not seen */
-			if ((!character_dungeon || !OPT(birth_no_preserve) ||
-					o_ptr->held_m_idx) && !object_was_sensed(o_ptr))
+			if ((!character_dungeon || !OPT(birth_no_preserve) || o_ptr->held_m_idx) && !object_name_is_visible(o_ptr))
 				o_ptr->artifact->created = FALSE;
 			else
 				history_lose_artifact(o_ptr->artifact);
@@ -3990,14 +4061,20 @@ bool obj_is_light(const object_type *o_ptr)   { return o_ptr->tval == TV_LIGHT; 
 bool obj_is_ring(const object_type *o_ptr)   { return o_ptr->tval == TV_RING; }
 
 
+bool obj_is_ammo(const object_type *o_ptr)
+{
+	if (!o_ptr->kind) return FALSE;
+
+	return base_is_ammo(o_ptr->kind->base);
+}
 /**
  * Determine whether an object is ammo
  *
  * \param o_ptr is the object to check
  */
-bool obj_is_ammo(const object_type *o_ptr)
+bool base_is_ammo(const object_base *base)
 {
-	switch (o_ptr->tval)
+	switch (base->tval)
 	{
 		case TV_SHOT:
 		case TV_ARROW:

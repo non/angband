@@ -899,4 +899,17 @@ enum
  */
 #define MAX_RVALS 4
 
+/**
+ * Whether to give the player access to the exact number of object flags 
+ * after an object has been pseudoed.
+ */
+#define SENSING_REVEALS_FLAG_COUNT	TRUE
+
+/*
+ * Iterators for *_info arrays
+ */
+#define for_each_kind(k)	for (k = &k_info[0]; k < &k_info[z_info->k_max]; k++) if (k->alloc_prob)
+#define for_each_ego(e)		for (e = &e_info[0]; e < &e_info[z_info->e_max]; e++) if (e->rarity)
+#define for_each_artifact(a)	for (a = &a_info[0]; a < &a_info[z_info->a_max]; a++) if (a->alloc_prob)
+
 #endif /* !INCLUDED_DEFINES_H */

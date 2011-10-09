@@ -47,7 +47,6 @@ static quality_squelch_struct quality_mapping[] =
 	{ TYPE_ARMOR_BODY,		TV_SOFT_ARMOR,	0,		SV_UNKNOWN },
 	{ TYPE_ARMOR_CLOAK,		TV_CLOAK,		SV_CLOAK, SV_FUR_CLOAK },
 	{ TYPE_ARMOR_CLOAK,		TV_CLOAK,		SV_ETHEREAL_CLOAK, SV_ETHEREAL_CLOAK },
-/* XXX Eddie need to assert SV_CLOAK < SV_FUR_CLOAK < SV_ELVEN_CLOAK */
 	{ TYPE_ARMOR_ELVEN_CLOAK, TV_CLOAK,		SV_ELVEN_CLOAK,	SV_ELVEN_CLOAK },
 	{ TYPE_ARMOR_SHIELD,	TV_SHIELD,		0,		SV_UNKNOWN },
 	{ TYPE_ARMOR_HEAD,		TV_HELM,		0,		SV_UNKNOWN },
@@ -256,37 +255,6 @@ squelch_type_t squelch_type_of(const object_type *o_ptr)
 	return TYPE_MAX;
 }
 
-/**
- * Small helper function to see how an object trait compares to the one
- * in its base type.
- *
- * If the base type provides a positive bonus, we'll use that. Otherwise, we'll
- * use zero (players don't consider an item with a positive bonus to be bad
- * even if the base kind has a higher positive bonus).
- */
-static int cmp_object_trait(int bonus, random_value base)
-{
-	int amt = randcalc(base, 0, MINIMISE);
-	if (amt > 0) amt = 0;
-	return CMP(bonus, amt);
-}
-
-/**
- * Small helper function to see if an item seems good, bad or average based on
- * to_h, to_d and to_a.
- *
- * The sign of the return value announces if the object is bad (negative),
- * good (positive) or average (zero).
- */
-static int is_object_good(const object_type *o_ptr)
-{
-	int good = 0;
-	good += 4 * cmp_object_trait(o_ptr->to_d, o_ptr->kind->to_d);
-	good += 2 * cmp_object_trait(o_ptr->to_h, o_ptr->kind->to_h);
-	good += 1 * cmp_object_trait(o_ptr->to_a, o_ptr->kind->to_a);
-	return good;
-}
-
 
 /*
  * Determine the squelch level of an object, which is similar to its pseudo.
@@ -336,14 +304,8 @@ byte squelch_level_of(const object_type *o_ptr)
 
 	/* CC: we need to redefine "bad" with multiple pvals
 	 * At the moment we use "all pvals known and negative" */
-	for (i = 0; i < o_ptr->num_pvals; i++) {
-		if (!object_this_pval_is_visible(o_ptr, i) ||
-			(o_ptr->pval[i] > 0))
-			break;
-
-		if (i == (o_ptr->num_pvals - 1))
-			return SQUELCH_BAD;
-	}
+	if (object_is_known_bad(o_ptr))
+		return SQUELCH_BAD;
 
 	if (object_was_sensed(o_ptr)) {
 		obj_pseudo_t pseudo = object_pseudo(o_ptr);
@@ -355,12 +317,12 @@ byte squelch_level_of(const object_type *o_ptr)
 			}
 
 			case INSCRIP_EXCELLENT: {
-				/* have to assume splendid until you have tested it */
-				if (object_was_worn(o_ptr)) {
-					if (object_high_resist_is_possible(o_ptr))
+				if (object_is_known_unsplendid(o_ptr)) {
+					if (object_high_resist_is_possible(o_ptr)) {
 						value = SQUELCH_EXCELLENT_NO_SPL;
-					else
+					} else {
 						value = SQUELCH_EXCELLENT_NO_HI;
+					}
 				} else {
 					value = SQUELCH_ALL;
 				}
@@ -375,25 +337,9 @@ byte squelch_level_of(const object_type *o_ptr)
 				value = SQUELCH_MAX;
 				break;
 
-			/* This is the interesting case */
 			case INSCRIP_STRANGE:
 			case INSCRIP_MAGICAL: {
-				value = SQUELCH_GOOD;
-
-				if ((object_attack_plusses_are_visible(o_ptr) ||
-						randcalc_valid(o_ptr->kind->to_h, o_ptr->to_h) ||
-						randcalc_valid(o_ptr->kind->to_d, o_ptr->to_d)) &&
-				    	(object_defence_plusses_are_visible(o_ptr) ||
-						randcalc_valid(o_ptr->kind->to_a, o_ptr->to_a))) {
-					int isgood = is_object_good(o_ptr);
-					if (isgood > 0) {
-						value = SQUELCH_GOOD;
-					} else if (isgood < 0) {
-						value = SQUELCH_BAD;
-					} else {
-						value = SQUELCH_AVERAGE;
-					}
-				}
+				value = object_is_known_bad(o_ptr) ? SQUELCH_BAD : SQUELCH_GOOD;
 				break;
 			}
 
@@ -404,8 +350,10 @@ byte squelch_level_of(const object_type *o_ptr)
 	}
 	else
 	{
-		if (object_was_worn(o_ptr))
-			value = SQUELCH_EXCELLENT_NO_SPL; /* object would be sensed if it were splendid */
+		if (object_is_known_not_excellent(o_ptr))
+			value = SQUELCH_GOOD;
+		else if (object_is_known_unsplendid(o_ptr))
+			value = SQUELCH_EXCELLENT_NO_SPL;
 		else if (object_is_known_not_artifact(o_ptr))
 			value = SQUELCH_ALL;
 		else

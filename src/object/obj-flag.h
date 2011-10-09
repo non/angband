@@ -65,7 +65,9 @@ enum object_flag_id {
 	OFID_NONE = 0,		/* never shown */
 	OFID_NORMAL,		/* normal ID on use */
 	OFID_TIMED,			/* obvious after time */
-	OFID_WIELD			/* obvious on wield */
+	OFID_WIELD,			/* obvious on wield */
+
+	OFID_MAX
 };
 
 #define OF_SIZE                	FLAG_SIZE(OF_MAX)
@@ -88,6 +90,8 @@ enum object_flag_id {
 #define of_comp_union(f1, f2)  	flag_comp_union(f1, f2, OF_SIZE)
 #define of_inter(f1, f2)       	flag_inter(f1, f2, OF_SIZE)
 #define of_diff(f1, f2)        	flag_diff(f1, f2, OF_SIZE)
+
+#define for_each_object_flag(f)	for (f = FLAG_START; f < OF_MAX; f++)
 
 /* Hack -- special "xtra" object flag info (type) */
 /* Can get rid of these now we have OFT_ flags */

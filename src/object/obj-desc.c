@@ -599,22 +599,27 @@ static size_t obj_desc_inscrip(const object_type *o_ptr, char *buf, size_t max, 
 		u[n++] = quark_str(o_ptr->note);
 
 	/* Use special inscription, if any */
-	if (!object_is_known(o_ptr) && feel)
+	if (!object_is_known(o_ptr) && object_was_sensed(o_ptr))
 	{
 		/* cannot tell excellent vs strange vs splendid until wield */
-		if (!object_was_worn(o_ptr) && o_ptr->ego)
+		if (o_ptr->ego &&
+		    !(object_is_known_splendid(o_ptr) || object_is_known_unsplendid(o_ptr)))
 			u[n++] = "ego";
 		else
 			u[n++] = inscrip_text[feel];
 	}
 	else if ((o_ptr->ident & IDENT_EMPTY) && !object_is_known(o_ptr))
 		u[n++] = "empty";
+	else if (!object_is_known(o_ptr) && !object_is_jewelry(o_ptr) && object_is_not_excellent(o_ptr) && object_name_is_visible(o_ptr))
+		u[n++] = "not excellent";
 	else if (!object_is_known(o_ptr) && object_was_worn(o_ptr))
 	{
 		if (wield_slot(o_ptr) == INVEN_WIELD || wield_slot(o_ptr) == INVEN_BOW)
 			u[n++] = "wielded";
 		else u[n++] = "worn";
 	}
+	else if (!object_is_known(o_ptr) && object_name_is_visible(o_ptr))
+		u[n++] = "not worn";
 	else if (!object_is_known(o_ptr) && object_was_fired(o_ptr))
 		u[n++] = "fired";
 	else if (!object_flavor_is_aware(o_ptr) && object_flavor_was_tried(o_ptr))

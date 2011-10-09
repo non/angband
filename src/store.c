@@ -2523,10 +2523,6 @@ void do_cmd_sell(cmd_code code, cmd_arg args[])
 	/* Update the display */
 	store_flags |= STORE_GOLD_CHANGE;
 
-	/* Update the auto-history if selling an artifact that was previously un-IDed. (Ouch!) */
-	if (o_ptr->artifact)
-		history_add_artifact(o_ptr->artifact, TRUE, TRUE);
-
 	/* Combine / Reorder the pack (later) */
 	p_ptr->notice |= (PN_COMBINE | PN_REORDER | PN_SORT_QUIVER);
 
@@ -2535,7 +2531,6 @@ void do_cmd_sell(cmd_code code, cmd_arg args[])
 
 	/* Get the "apparent" value */
 	dummy = object_value(&sold_item, amt, FALSE);
-/*	msg("Dummy is %d", dummy); */
 
 	/* Identify original object */
 	object_notice_everything(o_ptr);
@@ -2554,7 +2549,6 @@ void do_cmd_sell(cmd_code code, cmd_arg args[])
 
 	/* Get the "actual" value */
 	value = object_value(&sold_item, amt, FALSE);
-/*	msg("Value is %d", value); */
 
 	/* Get the description all over again */
 	object_desc(o_name, sizeof(o_name), &sold_item, ODESC_PREFIX | ODESC_FULL);
