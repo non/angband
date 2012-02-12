@@ -118,6 +118,7 @@ static struct room_profile default_rooms[] = {
 	{"crossed room", build_crossed, 1, 3, 3, FALSE, 1, 50},
 	{"circular room", build_circular, 2, 2, 1, FALSE, 1, 60},
 	{"overlap room", build_overlap, 1, 3, 1, FALSE, 1, 100},
+	{"room template", build_template, 1, 3, 1, FALSE, 1, 100},
 
 	/* normal rooms */
 	{"simple room", build_simple, 1, 3, 1, FALSE, 0, 100}
@@ -841,14 +842,17 @@ static int calc_obj_feeling(struct cave *c)
 	/* Check the loot adjusted for depth */
 	x = c->obj_rating / c->depth;
 
-	if (x > 6000) return 20;
-	if (x > 3500) return 30;
-	if (x > 2000) return 40;
-	if (x > 1000) return 50;
-	if (x > 500) return 60;
-	if (x > 300) return 70;
-	if (x > 200) return 80;
-	if (x > 100) return 90;
+	/* Apply a minimum feeling if there's an artifact on the level */
+	if (c->good_item && x < 64001) return 60;
+
+	if (x > 16000000) return 20;
+	if (x > 4000000) return 30;
+	if (x > 1000000) return 40;
+	if (x > 250000) return 50;
+	if (x > 64000) return 60;
+	if (x > 16000) return 70;
+	if (x > 4000) return 80;
+	if (x > 1000) return 90;
 	return 100;
 }
 

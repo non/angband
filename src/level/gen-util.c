@@ -293,9 +293,11 @@ void place_object(struct cave *c, int y, int x, int level, bool good, bool great
 			otype.artifact->created = FALSE;
 		return;
 	} else {
- 			if (otype.artifact)
+		if (otype.artifact)
 			c->good_item = TRUE;
-		c->obj_rating += rating;
+		if (rating > 250000)
+			rating = 250000; /* avoid overflows */
+		c->obj_rating += (rating / 10) * (rating / 10);
 	}
 }
 
