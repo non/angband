@@ -3020,12 +3020,10 @@ static void process_monster(struct cave *c, struct monster *m_ptr)
 				/* Creature can open doors. */
 				if (rf_has(m_ptr->race->flags, RF_OPEN_DOOR))	{
 					/* Closed doors and secret doors */
-					if (cave_iscloseddoor(cave, ny, nx)
-					 || cave_issecretdoor(cave, ny, nx)) {
-						/* The door is open */
+					if (cave_iscloseddoor(cave, ny, nx) ||
+						cave_issecretdoor(cave, ny, nx)) {
+						/* The door is open, so don't bash it */
 						did_open_door = TRUE;
-
-						/* Do not bash the door */
 						may_bash = FALSE;
 
 					/* Locked doors (not jammed) */
@@ -3035,13 +3033,17 @@ static void process_monster(struct cave *c, struct monster *m_ptr)
 						/* Try to unlock it */
 						if (randint0(m_ptr->hp / 10) > k) {
 							/* Print a message */
-							if (m_ptr->ml)
-								msg("%s fiddles with the lock.", m_name);
-							else
-								msg("Something fiddles with a lock.");
+							const char *s = m_ptr->ml ? m_name : "Something";
+							msg("%s fiddles with the lock.", s);
 
 							/* Reduce the power of the door by one */
-							cave_set_feat(c, ny, nx, cave->feat[ny][nx] - 1);
+							cave_weaken_locked_door(c, ny, nx);
+
+							/* If the door is now unlocked, open it */
+							if (!cave_islockeddoor(cave, ny, nx)) {
+								msg("You hear the locked door open!");
+								cave_open_door(c, ny, nx);
+							}
 
 							/* Do not bash the door */
 							may_bash = FALSE;
@@ -3062,19 +3064,17 @@ static void process_monster(struct cave *c, struct monster *m_ptr)
 							msg("Something slams against a door.");
 
 						/* Reduce the power of the door by one */
-						cave_unjam_door(c, ny, nx);
+						cave_weaken_locked_door(c, ny, nx);
 
 						/* If the door is no longer jammed */
-						if (!cave_isjammeddoor(cave, ny, nx)) {
+						if (!cave_islockeddoor(cave, ny, nx)) {
 							msg("You hear a door burst open!");
 
 							/* Disturb (sometimes) */
 							disturb(p_ptr, 0, 0);
 
-							/* The door was bashed open */
+							/* The door was bashed open; move into doorway */
 							did_bash_door = TRUE;
-
-							/* Hack -- fall into doorway */
 							do_move = TRUE;
 						}
 					}

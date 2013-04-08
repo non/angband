@@ -1050,7 +1050,6 @@ static tval_desc sval_dependent[] =
 	{ TV_FOOD,			"Food" },
 	{ TV_MAGIC_BOOK,	"Magic books" },
 	{ TV_PRAYER_BOOK,	"Prayer books" },
-	{ TV_SPIKE,			"Spikes" },
 	{ TV_LIGHT,			"Lights" },
 	{ TV_FLASK,			"Flasks of oil" },
 /*	{ TV_DRAG_ARMOR,	"Dragon Mail Armor" }, */

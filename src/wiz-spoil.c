@@ -113,7 +113,6 @@ static const grouper group_item[] =
 
 	{ TV_CHEST,		"Chests" },
 
-	{ TV_SPIKE,		"Various" },
 	{ TV_LIGHT,		  NULL },
 	{ TV_FLASK,		  NULL },
 	{ TV_JUNK,		  NULL },
@@ -394,6 +393,8 @@ static const grouper group_artifact[] =
 bool make_fake_artifact(object_type *o_ptr, struct artifact *artifact)
 {
 	object_kind *kind;
+
+	if (artifact == NULL) return FALSE;
 
 	/* Don't bother with empty artifacts */
 	if (!artifact->tval) return FALSE;

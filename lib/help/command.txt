@@ -204,28 +204,7 @@ Close a door ('c')
   Non-intelligent and some other creatures cannot open doors, so shutting
   doors can be quite valuable. Furthermore, monsters cannot see you behind
   closed doors, so closing doors may allow you to buy some time without
-  being attacked. Broken doors cannot be closed. Bashing a door open may
-  break it. This command may take a count, requires a direction, and takes
-  some energy.
-
-Jam a door ('j') or Spike a door ('S')
-  Many monsters can simply open closed doors, and can eventually get
-  through a locked door. You may therefore occasionally want to jam a door
-  shut with iron spikes. Each spike used on the door will make it harder
-  for a monster to bash down the door, and will make it take longer time,
-  up to a certain limit. A door that was locked before it was jammed or
-  spiked will be harder to bash down. Smaller monsters are less able to
-  bash down doors. In order to use this command, you must be carrying iron
-  spikes. This command requires a direction, and takes some energy.
-
-Bash a door ('B') or Force a door ('f')
-  This command allows you to bash down jammed doors. Your bashing ability
-  increases with strength. Bashing open a door can (briefly) throw you off
-  balance. Doors that are stuck, or which have been jammed closed with
-  spikes can only be opened by bashing, and all closed doors can be bashed
-  open if desired. Bashing a door open may permanently break it so that it
-  can never be closed. This command may take a count, requires a direction,
-  and takes some energy.
+  being attacked. Broken doors cannot be closed.
 
 Disarm a trap or chest, or lock a door ('D')
   You can attempt to disarm traps on the floor or on chests. If you fail,
@@ -238,13 +217,12 @@ Disarm a trap or chest, or lock a door ('D')
 
 Alter ('+')
   This special command allows the use of a single keypress to select any of
-  the "obvious" commands above (attack, tunnel, bash, open, disarm),
-  and, by using keymaps, to combine this keypress with directions. In
-  general, this allows the use of the "control" key plus the appropriate
-  "direction" key (including the roguelike direction keys in roguelike
-  mode) as a kind of generic "alter the terrain feature of an adjacent
-  grid" command. This command may take a count, requires a direction, and
-  takes some energy.
+  the "obvious" commands above (attack, tunnel, open, disarm), and, by
+  using keymaps, to combine this keypress with directions. In general,
+  this allows the use of the "control" key plus the appropriate "direction"
+  key (including the roguelike direction keys in roguelike mode) as a kind
+  of generic "alter the terrain feature of an adjacent grid" command. This
+  command may take a count, requires a direction, and takes some energy.
 
 Spell and Prayer Commands
 =========================

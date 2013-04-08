@@ -956,17 +956,6 @@ static void borg_parse_aux(char *msg, int len)
         /* Incase we failed our emergency use of MM */
         borg_confirm_target = FALSE;
 
-        /* Check to see if it was a door then convert it */
-        if (ag->feat == FEAT_DOOR_HEAD)
-        {
-            /* What is my chance of opening the door? */
-            if (borg_skill[BI_DIS] < 20)
-            {
-                /* Set door as jammed, then bash it */
-                ag->feat = FEAT_DOOR_HEAD + 0x08;
-            }
-        }
-
         /* check for glyphs since we no longer have a launch message */
         if (borg_casted_glyph)
         {
@@ -1441,24 +1430,6 @@ static void borg_parse_aux(char *msg, int len)
         }
         return;
     }
-
-    /* Feature XXX XXX XXX */
-    if (streq(msg, "The door appears to be stuck."))
-    {
-        /* Only process non-jammed doors */
-        if ((ag->feat >= FEAT_DOOR_HEAD) && (ag->feat <= FEAT_DOOR_HEAD + 0x07))
-        {
-            /* Mark the door as jammed */
-            ag->feat = FEAT_DOOR_HEAD + 0x08;
-
-            /* Clear goals */
-            goal = 0;
-        }
-
-        return;
-    }
-
-
 
     /* Feature XXX XXX XXX */
     if (streq(msg, "This seems to be permanent rock."))

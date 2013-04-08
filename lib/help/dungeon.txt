@@ -169,7 +169,7 @@ simply throw the item away. You can use this feature to learn item flavors.
 
 The General Store ('1')
   The General Store sells foods, some clothing, torches, scrolls of phase
-  door, scrolls of word of recall, oil, shovels, picks, and spikes. All of
+  door, scrolls of word of recall, oil, shovels, and picks. All of
   these items and some others can be sold back to the General store for
   money. The general store restocks like every store, but the inventory
   types never change.
