@@ -333,7 +333,7 @@ static int dir_transitions[10][10] =
  * Return TRUE if a direction was chosen, otherwise return FALSE.
  *
  * This function should be used for all "repeatable" commands, such as
- * run, walk, open, close, bash, disarm, spike, tunnel, etc, as well
+ * run, walk, open, close, bash, disarm, tunnel, etc, as well
  * as all commands which must reference a grid adjacent to the player,
  * and which may not reference the grid under the player.
  *

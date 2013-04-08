@@ -1171,7 +1171,7 @@ static bool do_cmd_bash_aux(int y, int x)
  * A closed door can be opened - harder if locked. Any door might be
  * bashed open (and thereby broken). Bashing a door is (potentially)
  * faster! You move into the door way. To open a stuck door, it must
- * be bashed. A closed door can be jammed (see do_cmd_spike()).
+ * be bashed.
  *
  * Creatures can also open or bash doors, see elsewhere.
  */
@@ -1287,139 +1287,6 @@ void do_cmd_alter(cmd_code code, cmd_arg args[])
 {
 	do_cmd_alter_aux(args[0].direction);
 }
-
-
-/*
- * Find the index of some "spikes", if possible.
- *
- * XXX XXX XXX Let user choose a pile of spikes, perhaps?
- */
-static bool get_spike(int *ip)
-{
-	int i;
-
-	/* Check every item in the pack */
-	for (i = 0; i < INVEN_PACK; i++)
-	{
-		object_type *o_ptr = &p_ptr->inventory[i];
-
-		/* Skip non-objects */
-		if (!o_ptr->kind) continue;
-
-		/* Check the "tval" code */
-		if (o_ptr->tval == TV_SPIKE)
-		{
-			/* Save the spike index */
-			(*ip) = i;
-
-			/* Success */
-			return (TRUE);
-		}
-	}
-
-	/* Oops */
-	return (FALSE);
-}
-
-
-/*
- * Determine if a given grid may be "spiked"
- */
-static bool do_cmd_spike_test(int y, int x)
-{
-	/* Must have knowledge */
-	if (!(cave->info[y][x] & (CAVE_MARK))) {
-		msg("You see nothing there.");
-		return FALSE;
-	}
-
-	/* Check if door is closed */
-	if (!cave_iscloseddoor(cave, y, x)) {
-		msg("You see nothing there to spike.");
-		return FALSE;
-	}
-
-	/* Check that the door is not fully spiked */
-	if (!cave_can_jam_door(cave, y, x)) {
-		msg("You can't use more spikes on this door.");
-		return FALSE;
-	}
-
-	/* Okay */
-	return TRUE;
-}
-
-
-/*
- * Jam a closed door with a spike
- *
- * This command may NOT be repeated
- */
-void do_cmd_spike(cmd_code code, cmd_arg args[])
-{
-	int y, x, dir, item = 0;
-
-	dir = args[0].direction;
-
-	/* Get a spike */
-	if (!get_spike(&item))
-	{
-		/* Message */
-		msg("You have no spikes!");
-
-		/* Done */
-		return;
-	}
-
-	/* Get location */
-	y = p_ptr->py + ddy[dir];
-	x = p_ptr->px + ddx[dir];
-
-
-	/* Verify legality */
-	if (!do_cmd_spike_test(y, x)) return;
-
-
-	/* Take a turn */
-	p_ptr->energy_use = 100;
-
-	/* Apply confusion */
-	if (player_confuse_dir(p_ptr, &dir, FALSE))
-	{
-		/* Get location */
-		y = p_ptr->py + ddy[dir];
-		x = p_ptr->px + ddx[dir];
-	}
-
-
-	/* Monster */
-	if (cave->m_idx[y][x] > 0)
-	{
-		/* Message */
-		msg("There is a monster in the way!");
-
-		/* Attack */
-		py_attack(y, x);
-	}
-
-	/* Go for it */
-	else
-	{
-		/* Verify legality */
-		if (!do_cmd_spike_test(y, x)) return;
-
-		/* Successful jamming */
-		msg("You jam the door with a spike.");
-
-		cave_jam_door(cave, y, x);
-
-		/* Use up, and describe, a single spike, from the bottom */
-		inven_item_increase(item, -1);
-		inven_item_describe(item);
-		inven_item_optimize(item);
-	}
-}
-
 
 /*
  * Determine if a given grid may be "walked"

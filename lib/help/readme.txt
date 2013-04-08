@@ -106,9 +106,5 @@ your melee damage. Teleport Other is now a bolt, affecting only one monster
 at a time, and *Destruction* now removes artifacts as well as monsters.
 Potions that cure wounds are no longer quite so powerful.
 
-Spiking doors is now a lot more useful, and you can lock doors too (by
-using the Disarm command). Monsters may take several turns to open/bash a
-locked and spiked door.
-
 Finally, mimics are a lot harder to spot ...
 

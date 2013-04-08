@@ -2237,7 +2237,7 @@ bool borg_crush_hole(void)
  * We penalize the loss of both power and monetary value, and reward
  * the loss of weight that may be slowing us down.  The weight loss
  * is worth one gold per tenth of a pound.  This causes things like
- * lanterns and chests and spikes to be considered "annoying".
+ * lanterns and chests to be considered "annoying".
  */
 bool borg_crush_slow(void)
 {

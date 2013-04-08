@@ -52,7 +52,6 @@ void do_cmd_tunnel(cmd_code code, cmd_arg args[]);
 void do_cmd_disarm(cmd_code code, cmd_arg args[]);
 void do_cmd_bash(cmd_code code, cmd_arg args[]);
 void do_cmd_alter(cmd_code code, cmd_arg args[]);
-void do_cmd_spike(cmd_code code, cmd_arg args[]);
 void do_cmd_walk(cmd_code code, cmd_arg args[]);
 void do_cmd_jump(cmd_code code, cmd_arg args[]);
 void do_cmd_run(cmd_code code, cmd_arg args[]);
