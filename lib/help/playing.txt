@@ -170,7 +170,7 @@ Roguelike Keyset Command Summary
   p    Cast a spell                    P    Browse a book
   q    Quaff a potion                  Q    Quit (commit suicide)
   r    Read a scroll                   R    Rest for a period
-  s    Search for traps/doors          S    Jam a door (Spike)
+  s    Search for traps/doors
   t    Fire an item                    T    Take off equipment
   u    (walk - north east)             U    (run - north east)
   v    Throw an item                   V    Version info

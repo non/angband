@@ -394,6 +394,8 @@ bool make_fake_artifact(object_type *o_ptr, struct artifact *artifact)
 {
 	object_kind *kind;
 
+	if (artifact == NULL) return FALSE;
+
 	/* Don't bother with empty artifacts */
 	if (!artifact->tval) return FALSE;
 
